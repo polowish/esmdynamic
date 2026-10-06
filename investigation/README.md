@@ -27,10 +27,10 @@ passes stops all gradient reaching the blocks during training. Full evidence and
 | # | check | status |
 |---|---|---|
 | 3 | preprint: how the DCM, its training and its ablation are described | done — `notes/01_preprint_review.md` |
-| 1 | minimal pure-PyTorch reproduction of the autocast-cache mechanism | to do |
-| 2 | did the June-2025 `train.py` (V1 era) also train under autocast? | to do |
-| 4 | which weights the Colab notebook and the Dockerfile load | to do |
-| 5 | deleting the DCM blocks leaves outputs bitwise identical | to do |
-| 6 | reproduce the published ATLAS-test numbers with the released weights | to do |
+| 1 | minimal pure-PyTorch reproduction of the autocast-cache mechanism | done — reproduced; 3 fixes verified — `notes/04_minimal_reproduction.md` |
+| 2 | did the June-2025 `train.py` (V1 era) also train under autocast? | done — yes; DCM code unchanged since — `notes/02_training_code_history.md` |
+| 4 | which weights the Colab notebook and the Dockerfile load | done — all load V2 `7odsk` — `notes/03_public_weight_sources.md` |
+| 5 | deleting the DCM blocks leaves outputs bitwise identical | done — 11/11 outputs identical — `notes/05_dcm_identity.md` |
+| 6 | reproduce the published ATLAS-test numbers with the released weights | done — 0.880 ± 0.010 vs 87% — `notes/06_atlas_reproduction.md` |
 | 7 | short training with and without the fix (if 1–6 justify it) | conditional |
 | 8 | released weights vs the published human-proteome predictions (if justified) | conditional |

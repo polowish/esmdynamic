@@ -1,0 +1,83 @@
+{
+  "n_proteins": 82,
+  "summary": {
+    "320K_all": {
+      "per_protein_mean": 0.8804901375754495,
+      "per_protein_se": 0.009696903235473203,
+      "pooled": 0.9063874463072745,
+      "recall_pooled": 0.8580110898568972,
+      "precision_pooled": 0.2649930264993027
+    },
+    "320K_triu": {
+      "per_protein_mean": 0.8797804639916331,
+      "per_protein_se": 0.009779148588732795,
+      "pooled": 0.9063338728216881,
+      "recall_pooled": 0.8580110898568972,
+      "precision_pooled": 0.26502374630716874
+    },
+    "320K_freq_rmse_mean": 0.08678771801764427,
+    "348K_all": {
+      "per_protein_mean": 0.8651887711483894,
+      "per_protein_se": 0.011957848519719453,
+      "pooled": 0.9171270318449791,
+      "recall_pooled": 0.9110874355311267,
+      "precision_pooled": 0.18393732042622304
+    },
+    "348K_triu": {
+      "per_protein_mean": 0.8640402483053352,
+      "per_protein_se": 0.012110672584163864,
+      "pooled": 0.9170326746979225,
+      "recall_pooled": 0.9110874355311267,
+      "precision_pooled": 0.18394788623947397
+    },
+    "348K_freq_rmse_mean": 0.08799304748494502,
+    "379K_all": {
+      "per_protein_mean": 0.8266354678816641,
+      "per_protein_se": 0.014059468765382038,
+      "pooled": 0.9115312346523156,
+      "recall_pooled": 0.9547930942637837,
+      "precision_pooled": 0.12108872992256918
+    },
+    "379K_triu": {
+      "per_protein_mean": 0.8249353421393916,
+      "per_protein_se": 0.014268722501777222,
+      "pooled": 0.9113657346983934,
+      "recall_pooled": 0.9547930942637837,
+      "precision_pooled": 0.12109021730952596
+    },
+    "379K_freq_rmse_mean": 0.09155711978258946,
+    "413K_all": {
+      "per_protein_mean": 0.7276654815519129,
+      "per_protein_se": 0.016541429794676592,
+      "pooled": 0.8486689647955064,
+      "recall_pooled": 0.9885348313518487,
+      "precision_pooled": 0.06061564398971514
+    },
+    "413K_triu": {
+      "per_protein_mean": 0.7250957790618163,
+      "per_protein_se": 0.016797517267421215,
+      "pooled": 0.8483025211233086,
+      "recall_pooled": 0.9885348313518487,
+      "precision_pooled": 0.06061620648900978
+    },
+    "413K_freq_rmse_mean": 0.10202218626394444,
+    "450K_all": {
+      "per_protein_mean": 0.5575116497545604,
+      "per_protein_se": 0.006238681884515375,
+      "pooled": 0.5984307137183711,
+      "recall_pooled": 0.999915252185283,
+      "precision_pooled": 0.0231204212518301
+    },
+    "450K_triu": {
+      "per_protein_mean": 0.5542623653145566,
+      "per_protein_se": 0.006363422615930608,
+      "pooled": 0.5974195154432539,
+      "recall_pooled": 0.999915252185283,
+      "precision_pooled": 0.02312060895010639
+    },
+    "450K_freq_rmse_mean": 0.1362594460736258
+  },
+  "preprint": {
+    "balanced_accuracy": 0.87
+  }
+}
