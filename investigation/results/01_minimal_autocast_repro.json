@@ -1,0 +1,105 @@
+{
+  "torch": "2.8.0+cu129",
+  "cuda": "12.9",
+  "device": "NVIDIA L40S",
+  "A": [
+    {
+      "dtype": "bfloat16",
+      "cache_enabled": true,
+      "no_grad_use_first": true,
+      "weight": "none",
+      "bias": "none"
+    },
+    {
+      "dtype": "bfloat16",
+      "cache_enabled": true,
+      "no_grad_use_first": false,
+      "weight": "nonzero",
+      "bias": "nonzero"
+    },
+    {
+      "dtype": "bfloat16",
+      "cache_enabled": false,
+      "no_grad_use_first": true,
+      "weight": "nonzero",
+      "bias": "nonzero"
+    },
+    {
+      "dtype": "bfloat16",
+      "cache_enabled": false,
+      "no_grad_use_first": false,
+      "weight": "nonzero",
+      "bias": "nonzero"
+    },
+    {
+      "dtype": "float16",
+      "cache_enabled": true,
+      "no_grad_use_first": true,
+      "weight": "none",
+      "bias": "none"
+    },
+    {
+      "dtype": "float16",
+      "cache_enabled": true,
+      "no_grad_use_first": false,
+      "weight": "nonzero",
+      "bias": "nonzero"
+    },
+    {
+      "dtype": "float16",
+      "cache_enabled": false,
+      "no_grad_use_first": true,
+      "weight": "nonzero",
+      "bias": "nonzero"
+    },
+    {
+      "dtype": "float16",
+      "cache_enabled": false,
+      "no_grad_use_first": false,
+      "weight": "nonzero",
+      "bias": "nonzero"
+    }
+  ],
+  "B_C": {
+    "as ESMDynamic trains: one bf16 autocast region, cache on": {
+      "norm.weight": "zero",
+      "norm.bias": "zero",
+      "inp.weight": "none",
+      "inp.bias": "none",
+      "out.weight": "none",
+      "out.bias": "none"
+    },
+    "fix 1: autocast(cache_enabled=False)": {
+      "norm.weight": "zero",
+      "norm.bias": "zero",
+      "inp.weight": "zero",
+      "inp.bias": "zero",
+      "out.weight": "nonzero",
+      "out.bias": "nonzero"
+    },
+    "fix 2: no_grad passes outside the autocast region": {
+      "norm.weight": "zero",
+      "norm.bias": "zero",
+      "inp.weight": "zero",
+      "inp.bias": "zero",
+      "out.weight": "nonzero",
+      "out.bias": "nonzero"
+    },
+    "fix 3: torch.clear_autocast_cache() before the grad pass": {
+      "norm.weight": "zero",
+      "norm.bias": "zero",
+      "inp.weight": "zero",
+      "inp.bias": "zero",
+      "out.weight": "nonzero",
+      "out.bias": "nonzero"
+    },
+    "no autocast (fp32)": {
+      "norm.weight": "zero",
+      "norm.bias": "zero",
+      "inp.weight": "zero",
+      "inp.bias": "zero",
+      "out.weight": "nonzero",
+      "out.bias": "nonzero"
+    }
+  }
+}

@@ -1,0 +1,429 @@
+{
+  "torch": "2.8.0+cu129",
+  "device": "NVIDIA L40S",
+  "proteins": {
+    "ubiquitin": {
+      "length": 76,
+      "rerun": {
+        "dynamic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "dynamic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "dynamic_pred": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "dynamic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_pred_class": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "kinetic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_value": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_residual_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        }
+      },
+      "no_blocks": {
+        "dynamic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "dynamic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "dynamic_pred": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "dynamic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_pred_class": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "kinetic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_value": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_residual_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        }
+      },
+      "perturbed": {
+        "dynamic_logits": {
+          "equal": false,
+          "max_abs_diff": 0.0036839842796325684
+        },
+        "dynamic_prob": {
+          "equal": false,
+          "max_abs_diff": 0.0008327364921569824
+        },
+        "dynamic_pred": {
+          "equal": false,
+          "max_abs_diff": null
+        },
+        "dynamic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_pred_class": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "kinetic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_value": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_residual_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        }
+      }
+    },
+    "GB1": {
+      "length": 56,
+      "rerun": {
+        "dynamic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "dynamic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "dynamic_pred": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "dynamic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_pred_class": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "kinetic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_value": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_residual_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        }
+      },
+      "no_blocks": {
+        "dynamic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "dynamic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "dynamic_pred": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "dynamic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_pred_class": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "kinetic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_value": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_residual_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        }
+      },
+      "perturbed": {
+        "dynamic_logits": {
+          "equal": false,
+          "max_abs_diff": 0.0036197900772094727
+        },
+        "dynamic_prob": {
+          "equal": false,
+          "max_abs_diff": 0.0008227825164794922
+        },
+        "dynamic_pred": {
+          "equal": false,
+          "max_abs_diff": null
+        },
+        "dynamic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_pred_class": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "kinetic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_value": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_residual_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        }
+      }
+    },
+    "HEWL": {
+      "length": 129,
+      "rerun": {
+        "dynamic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "dynamic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "dynamic_pred": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "dynamic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_pred_class": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "kinetic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_value": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_residual_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        }
+      },
+      "no_blocks": {
+        "dynamic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "dynamic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "dynamic_pred": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "dynamic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_pred_class": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "kinetic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_value": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_residual_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        }
+      },
+      "perturbed": {
+        "dynamic_logits": {
+          "equal": false,
+          "max_abs_diff": 0.0035950541496276855
+        },
+        "dynamic_prob": {
+          "equal": false,
+          "max_abs_diff": 0.0008546113967895508
+        },
+        "dynamic_pred": {
+          "equal": false,
+          "max_abs_diff": null
+        },
+        "dynamic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_logits": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_prob": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "kinetic_pred_class": {
+          "equal": true,
+          "max_abs_diff": null
+        },
+        "kinetic_confidence": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_value": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        },
+        "frequency_residual_pred": {
+          "equal": true,
+          "max_abs_diff": 0.0
+        }
+      }
+    }
+  }
+}
