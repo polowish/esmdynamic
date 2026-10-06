@@ -6,7 +6,8 @@
         [--out investigation/figures/training_check/07_training_check.png]
 
 A  Frobenius norm of every DCM block's zero-initialised output layers, per step
-B  training loss per step (same batches in both runs), with a 25-step running mean
+B  the paired training-loss difference, fixed minus as-released, per step and as a 25-step
+   running mean (both runs see identical batches, so per-batch difficulty cancels)
 C  validation before and after: each head's loss (relative to its starting value) and the
    dynamic head's balanced accuracy
 """
@@ -57,22 +58,29 @@ def main():
         steps = [t["step"] for t in r["train"]]
         a.plot([0] + steps, [r["before"]["block_output_norm"]] + [t["block_output_norm"] for t in r["train"]],
                color=col, lw=2, label=label, zorder=3)
-        loss = [t["loss"] for t in r["train"]]
-        b.plot(steps, loss, color=col, lw=0.8, alpha=0.25, zorder=2)
-        b.plot(steps, running_mean(loss), color=col, lw=2, label=label, zorder=3)
+    (on, _), (off, _) = runs.values()
+    steps = [t["step"] for t in off["train"]]
+    diff = np.array([t["loss"] for t in off["train"]]) - np.array([t["loss"] for t in on["train"]])
+    b.axhline(0, color=MUTED, lw=1, zorder=1)
+    b.plot(steps, diff, color=FIX, lw=0.8, alpha=0.3, zorder=2)
+    b.plot(steps, running_mean(diff), color=FIX, lw=2.2, zorder=3)
+    b.set_ylim(np.nanpercentile(diff, 2) * 1.1, np.nanpercentile(diff, 98) * 1.1)
+    b.text(steps[-1], 0, "  no difference", va="bottom", ha="right", fontsize=8, color=MUTED)
     a.set_xlabel("optimiser step", color=INK_2, fontsize=9)
     a.set_ylabel("norm of the DCM blocks' zero-initialised output layers", color=INK_2, fontsize=9)
     a.set_title("A   Do the blocks leave initialisation?", loc="left", color=INK, fontsize=10.5, pad=8)
     a.legend(frameon=False, fontsize=8.5, labelcolor=INK_2, loc="upper left")
     style(a)
     b.set_xlabel("optimiser step (identical batches in both runs)", color=INK_2, fontsize=9)
-    b.set_ylabel("training loss (thin: per step; thick: 25-step mean)", color=INK_2, fontsize=9)
-    b.set_title("B   Training loss", loc="left", color=INK, fontsize=10.5, pad=8)
+    b.set_ylabel("training loss, fixed minus as-released\n(thin: per step; thick: 25-step mean)",
+                 color=INK_2, fontsize=9)
+    b.set_title("B   Paired training loss: below 0 = the fix fits better", loc="left", color=INK,
+                fontsize=10.5, pad=8)
     style(b)
 
     keys = [("val_loss_dynamic_logits", "dynamic loss"), ("val_loss_kinetic_logits", "kinetic loss"),
             ("val_loss_frequency_pred", "frequency loss")]
-    names = [k[1] for k in keys] + ["dynamic bal. acc."]
+    names = [k[1].replace(" ", "\n") for k in keys] + ["dynamic\nbal. acc."]
     x = np.arange(len(names))
     w = 0.36
     for k, (label, (r, col)) in enumerate(runs.items()):
