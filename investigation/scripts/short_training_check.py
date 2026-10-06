@@ -76,6 +76,31 @@ def provide_sigmoid_focal_loss():
     sys.modules.update({"torchvision": tv, "torchvision.ops": ops, "torchvision.ops.focal_loss": fl})
 
 
+def provide_tensorboard_stub():
+    """train.py imports torch.utils.tensorboard.SummaryWriter at module level, for its own
+    logging only; the inference environment has no tensorboard. This check imports two of
+    train.py's helpers and never logs, so a no-op SummaryWriter is enough."""
+    import sys
+    import types
+
+    try:
+        import tensorboard  # noqa: F401
+        return
+    except ImportError:
+        pass
+
+    class SummaryWriter:
+        def __init__(self, *a, **k):
+            pass
+
+        def __getattr__(self, name):
+            return lambda *a, **k: None
+
+    tb = types.ModuleType("torch.utils.tensorboard")
+    tb.SummaryWriter = SummaryWriter
+    sys.modules["torch.utils.tensorboard"] = tb
+
+
 def block_output_norm(model):
     total = 0.0
     for n, p in model.heads.named_parameters():
@@ -101,6 +126,7 @@ def main():
     from esm.esmfold.v1.misc import batch_encode_sequences
     from esm.esmdynamic.training.data_reader import DynContactDataset
     provide_sigmoid_focal_loss()
+    provide_tensorboard_stub()
     from esm.esmdynamic.training import loss as loss_mod
     from esm.esmdynamic.training.train import (build_outputs_and_targets_for_loss,
                                                 metrics_dynamic_batch)
