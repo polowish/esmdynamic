@@ -115,7 +115,12 @@ def main():
     ap.add_argument("--data", default="investigation/data/mdcath/dataset")
     ap.add_argument("--splits", default="investigation/data/mdcath")
     ap.add_argument("--steps", type=int, default=300)
-    ap.add_argument("--batch", type=int, default=4)
+    ap.add_argument("--batch", type=int, default=1, help="samples per forward pass")
+    ap.add_argument("--accum", type=int, default=4,
+                    help="forward passes per optimiser step (the preprint's batch 64 on a 24 GB "
+                         "card implies accumulation; batch 4 with gradient through every block "
+                         "does not fit a 44 GB L40S)")
+    ap.add_argument("--chunk-size", type=int, default=256, help="as train.py's init_model sets")
     ap.add_argument("--n-val", type=int, default=48)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default=None)
@@ -134,6 +139,7 @@ def main():
     cache = args.cache == "on"
     torch.manual_seed(args.seed)
     model = esmdynamic().cuda()
+    model.set_chunk_size(args.chunk_size)
     model.esmfold.requires_grad_(False)
     model.train()
     opt = torch.optim.Adam(model.heads.parameters(), lr=1e-4)
@@ -162,7 +168,7 @@ def main():
     w = torch.tensor(lengths / lengths.sum())
     plan = []
     for _ in range(args.steps):
-        idx = torch.multinomial(w, args.batch, replacement=True, generator=g).tolist()
+        idx = torch.multinomial(w, args.batch * args.accum, replacement=True, generator=g).tolist()
         starts = [int(torch.randint(0, max(1, int(lengths[i]) - 256), (), generator=g))
                   if lengths[i] > 256 else 0 for i in idx]
         plan.append(list(zip(idx, starts)))
@@ -187,19 +193,27 @@ def main():
         return loss, outs, tgts, L
 
     def evaluate():
+        """Loss per head (they live on very different scales) and dynamic balanced accuracy,
+        over the fixed validation crops, one protein at a time."""
         model.eval()
-        losses, ba = [], []
-        for k in range(0, len(val_plan), args.batch):
-            batch = [load(ds_val, i, s) for i, s in val_plan[k:k + args.batch]]
+        per_head = {h: [] for h in LOSS_HEADS}
+        ba = []
+        for i, s in val_plan:
             with torch.no_grad():
-                loss, outs, tgts, L = forward(batch, train=False)
-            losses.append(float(loss))
-            m = metrics_dynamic_batch(outs["dynamic_logits"].float(), tgts["dynamic_logits"].float(), L)
-            ba.append(m["bal_acc"])
+                _, outs, tgts, L = forward([load(ds_val, i, s)], train=False)
+                for h in LOSS_HEADS:
+                    kw = kin_w.to(outs["kinetic_logits"].dtype)
+                    per_head[h].append(float(loss_mod.esmdynamic_loss(
+                        outs, tgts, L.cuda(), active_heads=[h], kin_class_weights=kw,
+                        alpha=0.85, gamma=2)))
+            ba.append(metrics_dynamic_batch(outs["dynamic_logits"].float(),
+                                            tgts["dynamic_logits"].float(), L)["bal_acc"])
         model.train()
-        return {"val_loss": float(np.mean(losses)), "val_dynamic_bal_acc": float(np.mean(ba))}
+        return {**{f"val_loss_{h}": float(np.mean(v)) for h, v in per_head.items()},
+                "val_dynamic_bal_acc": float(np.mean(ba))}
 
-    log = {"cache_enabled": cache, "steps": args.steps, "batch": args.batch, "seed": args.seed,
+    log = {"cache_enabled": cache, "steps": args.steps, "batch": args.batch, "accum": args.accum,
+           "chunk_size": args.chunk_size, "seed": args.seed,
            "torch": torch.__version__, "device": torch.cuda.get_device_name(0),
            "first_batch_ids": [train_ids[i] for i, _ in plan[0]], "train": [],
            "before": evaluate()}
@@ -207,12 +221,15 @@ def main():
     print(f"cache={args.cache}  before: {log['before']}  first batch {log['first_batch_ids']}")
     t0 = time.time()
     for step, b in enumerate(plan, 1):
-        batch = [load(ds_train, i, s) for i, s in b]
-        loss, *_ = forward(batch, train=True)
         opt.zero_grad(set_to_none=True)
-        loss.backward()
+        step_loss = 0.0
+        for k in range(0, len(b), args.batch):
+            batch = [load(ds_train, i, s) for i, s in b[k:k + args.batch]]
+            loss, *_ = forward(batch, train=True)
+            (loss / args.accum).backward()
+            step_loss += float(loss) / args.accum
         opt.step()
-        rec = {"step": step, "loss": float(loss), "block_output_norm": block_output_norm(model)}
+        rec = {"step": step, "loss": step_loss, "block_output_norm": block_output_norm(model)}
         log["train"].append(rec)
         if step % 10 == 0 or step == 1:
             print(f"  step {step:>4}  loss {rec['loss']:.4f}  block-output norm "
