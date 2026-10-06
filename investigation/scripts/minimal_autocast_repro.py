@@ -33,7 +33,10 @@ def grad_state(p):
 def part_a(dtype, cache, noprior):
     torch.manual_seed(0)
     lin = nn.Linear(64, 64).cuda()
-    x = torch.randn(8, 64, device="cuda")
+    # the input carries gradient, as the DCM's input does (it comes from trained
+    # transitions); without that, the cached weights leave the output with no grad_fn at
+    # all and backward() raises -- the bug in its most visible form
+    x = torch.randn(8, 64, device="cuda", requires_grad=True)
     with torch.autocast("cuda", dtype=dtype, cache_enabled=cache):
         if not noprior:
             with torch.no_grad():
@@ -75,7 +78,7 @@ def recycle(block, x0, n_passes=4, autocast_ctx=None, clear_cache=False):
 def part_bc(variant):
     torch.manual_seed(0)
     block = Block().cuda()
-    x0 = torch.randn(8, 64, device="cuda")
+    x0 = torch.randn(8, 64, device="cuda", requires_grad=True)   # as above
     if variant == "as ESMDynamic trains: one bf16 autocast region, cache on":
         with torch.autocast("cuda", dtype=torch.bfloat16):
             y = recycle(block, x0)
