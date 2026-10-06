@@ -35,6 +35,47 @@ ZERO_INIT = ("seq_attention.o_proj.weight", "mlp_seq.mlp.3.weight", "mlp_pair.ml
 LOSS_HEADS = ["dynamic_logits", "kinetic_logits", "frequency_pred"]
 
 
+def provide_sigmoid_focal_loss():
+    """training/loss.py imports torchvision's sigmoid_focal_loss; the ESMDynamic inference
+    environment has no torchvision. Rather than install a package into the environment the
+    extraction runs in, register a copy of that one function under the module path the loss
+    imports. It is torchvision 0.23's implementation, line for line."""
+    import sys
+    import types
+
+    if "torchvision.ops.focal_loss" in sys.modules:
+        return
+    try:
+        import torchvision.ops.focal_loss  # noqa: F401
+        return
+    except ImportError:
+        pass
+    import torch.nn.functional as F
+
+    def sigmoid_focal_loss(inputs, targets, alpha=0.25, gamma=2, reduction="none"):
+        p = torch.sigmoid(inputs)
+        ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+        p_t = p * targets + (1 - p) * (1 - targets)
+        loss = ce_loss * ((1 - p_t) ** gamma)
+        if alpha >= 0:
+            alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
+            loss = alpha_t * loss
+        if reduction == "none":
+            return loss
+        if reduction == "mean":
+            return loss.mean()
+        if reduction == "sum":
+            return loss.sum()
+        raise ValueError(f"invalid reduction {reduction!r}")
+
+    tv = types.ModuleType("torchvision")
+    ops = types.ModuleType("torchvision.ops")
+    fl = types.ModuleType("torchvision.ops.focal_loss")
+    fl.sigmoid_focal_loss = sigmoid_focal_loss
+    tv.ops, ops.focal_loss = ops, fl
+    sys.modules.update({"torchvision": tv, "torchvision.ops": ops, "torchvision.ops.focal_loss": fl})
+
+
 def block_output_norm(model):
     total = 0.0
     for n, p in model.heads.named_parameters():
@@ -59,6 +100,7 @@ def main():
     from esm.esmdynamic.pretrained import esmdynamic
     from esm.esmfold.v1.misc import batch_encode_sequences
     from esm.esmdynamic.training.data_reader import DynContactDataset
+    provide_sigmoid_focal_loss()
     from esm.esmdynamic.training import loss as loss_mod
     from esm.esmdynamic.training.train import (build_outputs_and_targets_for_loss,
                                                 metrics_dynamic_batch)
