@@ -34,4 +34,5 @@ passes stops all gradient reaching the blocks during training. Full evidence and
 | 6 | reproduce the published ATLAS-test numbers with the released weights | done — 0.880 ± 0.010 vs 87% — `notes/06_atlas_reproduction.md` |
 | 7 | short training with and without the fix (if 1–6 justify it) | done — blocks train only with the fix; training loss −6%; held-out mixed — `notes/07_training_check.md` |
 | — | supplement: parameter table and ablation numbers | done — `notes/09_supplement_ablation.md` |
+| — | mdCATH test split vs SI Table 6, and the paper-comparison figure | done — 320 K reproduces (0.806 vs 0.796) — `notes/10_mdcath_test_reproduction.md` |
 | 8 | released weights vs the published human-proteome predictions (if justified) | skipped — settled by checks 4 and 6 — `notes/08_proteome_check_skipped.md` |
