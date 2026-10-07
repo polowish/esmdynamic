@@ -71,8 +71,8 @@ compute anything.
 
 ## Open items this raises
 
-- The supplement's Table S4 (parameter counts) and S12–S19 (ablation numbers) would show
-  the size of the gap. Needs a manual download in a browser.
+- The supplement's parameter table and ablation numbers: now read, see
+  `09_supplement_ablation.md`.
 - If the ablation models were trained with the same `train.py` (autocast on), their DCM-less
   variant is unaffected by the bug, and the comparison is "dead blocks + embeddings" vs
   "nothing" — check 6 (reproducing the ATLAS numbers) tells us whether the paper's main
