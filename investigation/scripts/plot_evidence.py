@@ -96,7 +96,7 @@ def e1(plt, out):
     ax.legend(loc="lower right", frameon=False, fontsize=8.6, labelcolor=INK)
     titled(fig, "E1  Every Evoformer-block tensor in both released weight files is at its initial value",
            "Each tensor tested against its initialiser: LayerNorm weights exactly 1, zero-initialised layers exactly 0, "
-           "the rest matching their random initialiser's statistics.\nEverything outside the blocks was trained. "
+           "the rest matching their random initialiser's statistics.\nOutside the blocks, only the occupancy head's per-residue path is untouched (it reaches no loss once the blocks are dead). "
            "Source: dyn_models/scripts/diagnostics/esmdyn_checkpoint_audit.py on both Illinois Data Bank files.")
     save(fig, out, "E1_block_weights_at_init.png")
 
@@ -212,7 +212,7 @@ def e5(plt, out):
     a.set_yticklabels([g[0] for g in GRADS], fontsize=9, color=INK)
     a.set_xlabel("gradient norm after one training step (log)", color=INK_2, fontsize=8.8)
     style(a, "x")
-    a.set_title("A  one step of train.py, dynamic-contact head", loc="left", fontsize=10, color=INK)
+    a.set_title("A  one training-mode step (train.py setup), dynamic head", loc="left", fontsize=10, color=INK)
     x = np.arange(len(CENSUS))
     for i, (lab, nz, z, none) in enumerate(CENSUS):
         bottom = 0
@@ -233,10 +233,12 @@ def e5(plt, out):
                       Patch(color=ORANGE, label="no gradient (not in the graph)")],
              loc="upper left", bbox_to_anchor=(1.0, 1.0), frameon=False, fontsize=8, labelcolor=INK)
     fig.subplots_adjust(right=0.80)
-    titled(fig, "E5  In ESMDynamic's own training step, every trained part gets gradient except the Evoformer blocks",
-           "A: upstream train.py's loss and autocast settings, one step from the released weights (esmdyn_grad_check.py, "
-           "job 2153891). B: one backward through a DynamicModule\nwith the training-time autocast settings, then with "
-           "the cache turned off (esmdyn_block_grad.py, job 2153909). Turning the cache off is the whole fix.")
+    titled(fig, "E5  In ESMDynamic's training setup, every trained part gets gradient except the Evoformer blocks",
+           "A: one training-mode step in train.py's setup (train mode, ESMFold frozen, bf16 autocast) on ubiquitin + GB1, with a stand-in "
+           "loss Σ mean(output²) over the head outputs train.py's losses read\n(esmdyn_grad_check.py, job 2153891). B: one "
+           "training-mode backward through a DynamicModule on random inputs, cache on vs off (esmdyn_block_grad.py, job 2153909). "
+           "Whether a\nparameter gets gradient depends on the graph, not the loss; E6 confirms it with ESMDynamic's real losses. "
+           "Diagnostic: the output layers get None, so they never move.")
     save(fig, out, "E5_training_step_gradients.png")
 
 
@@ -271,9 +273,9 @@ def e6(plt, out):
     b.set_ylim(-260, 30)
     style(b)
     b.set_title("B  does the model fit better? (lower = better)", loc="left", fontsize=10, color=INK)
-    titled(fig, "E6  With the one-line fix the blocks train, and the training loss falls further",
-           "Two 500-step runs from the released V2 weights on mdCATH, identical except autocast(cache_enabled=…): same "
-           "samples, same crops, bit-identical first loss.\nHeld-out after 500 steps is mixed (balanced accuracy +2.6 "
+    titled(fig, "E6  With the one-line fix the blocks train, and the model fits its training data better",
+           "Two 500-step fine-tuning runs from the released V2 weights on the authors' mdCATH training split, identical except "
+           "autocast(cache_enabled=…): same samples, same crops,\nbit-identical first loss. Held-out after 500 steps is mixed (balanced accuracy +2.6 "
            "points, occupancy loss −7%, dynamic focal loss +5%); a real answer needs full retraining. Note 07, jobs 2157527/8.")
     save(fig, out, "E6_fix_trains_blocks.png")
 

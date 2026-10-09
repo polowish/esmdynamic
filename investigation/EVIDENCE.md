@@ -55,7 +55,9 @@ trained parts around the blocks. Source: `dyn_models/scripts/diagnostics/esmdyn_
 
 480 of 480 block tensors in V2 (2026-04), 160 of 160 in V1 (2025-06). LayerNorm weights
 are exactly 1, zero-initialised layers exactly 0, and the remaining matrices match their
-random initialiser's statistics. Every other component was trained. Source:
+random initialiser's statistics. Outside the blocks, everything trained except the occupancy
+head's per-residue path (its sequence transition and recycling s-norm), which reaches no
+loss once the blocks are dead (see the flowchart, `figures/gradient_flow/02_gradient_flowchart.png`). Source:
 `dyn_models/scripts/diagnostics/esmdyn_checkpoint_audit.py`.
 
 ### E2 · The blocks' output layers are exactly zero
@@ -84,13 +86,18 @@ autocast region with the default cache, the block gets no gradient at all; each 
 one-line fixes restores it. Same result with float16. Note 04,
 `scripts/minimal_autocast_repro.py`, torch 2.8.0 (the version the install instructions pin).
 
-### E5 · In ESMDynamic's own training step, only the blocks get no gradient
+### E5 · In ESMDynamic's training setup, only the blocks get no gradient
 
 ![E5](figures/evidence/E5_training_step_gradients.png)
 
-A: one step of upstream `train.py`'s loss from the released weights; every trained
-component gets gradient, the blocks exactly none. B: 116 of a DCM's 166 tensors are not in
-the autograd graph at all under the training settings; with the cache off, all are. Sources:
+A: one training-mode step in `train.py`'s setup (train mode, ESMFold frozen, bf16 autocast)
+from the released weights, on two real proteins (ubiquitin, GB1), with a stand-in loss
+(Σ mean(output²) over the head outputs `train.py`'s losses read): every trained component
+gets gradient, the blocks exactly none. Whether a parameter gets gradient depends on the
+graph, not on the loss; E6 confirms the result with ESMDynamic's real losses. This is one
+step, so the LayerNorms' zeros would be normal for a first step; what is diagnostic is that
+the output layers get no gradient at all, so they can never leave zero. B: one training-mode backward through a DCM on random inputs: 116 of its 166 tensors (every
+block Linear) are not in the autograd graph at all with the cache on; with it off, all are. Sources:
 `dyn_models/scripts/diagnostics/esmdyn_grad_check.py` (job 2153891), `esmdyn_block_grad.py`
 (job 2153909).
 
@@ -98,9 +105,11 @@ the autograd graph at all under the training settings; with the cache off, all a
 
 ![E6](figures/evidence/E6_fix_trains_blocks.png)
 
-Two 500-step fine-tuning runs from the released weights, identical (same samples, same
-crops, bit-identical first loss) except `cache_enabled`. As released, the blocks stay at
-0.000; fixed, their output layers grow to 26.3 and the training loss falls ~6% further.
+Two 500-step fine-tuning runs from the released weights on the authors' mdCATH training split
+(data the released heads were already trained on), identical (same samples, same crops,
+bit-identical first loss) except `cache_enabled`. As released, the blocks stay at
+0.000; fixed, their output layers grow to 26.3 and the model fits its training data ~6% better
+(training loss, paired by batch).
 The held-out effect of 500 steps is mixed (balanced accuracy +2.6 points, occupancy loss
 −7%, focal loss +5%), so whether trained blocks generalise better needs a proper
 retraining. Note 07.
