@@ -78,45 +78,52 @@ def main():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(1, 5, figsize=(17, 4.6), facecolor="white")
-    fig.subplots_adjust(top=0.65, bottom=0.17, left=0.04, right=0.99, wspace=0.32)
+    fig, grid = plt.subplots(2, 3, figsize=(14, 9.4), facecolor="white")
+    fig.subplots_adjust(top=0.84, bottom=0.07, left=0.06, right=0.985, wspace=0.26, hspace=0.38)
+    axes = grid.ravel()[:len(PUBLISHED)]
     x = np.arange(len(TEMPS))
-    for ax, m in zip(axes, PUBLISHED):
+    for i, (ax, m) in enumerate(zip(axes, PUBLISHED)):
         pm, ps = zip(*PUBLISHED[m])
         om, os_ = zip(*ours[m])
-        ax.errorbar(x, pm, yerr=ps, color=PUB, lw=2.2, marker="o", ms=7, capsize=3, zorder=3)
-        ax.errorbar(x + 0.08, om, yerr=os_, color=OURS, lw=0, elinewidth=1.4, marker="D", ms=6,
-                    capsize=3, zorder=4, mec="white", mew=0.8)
+        # three points per temperature, side by side: published, released, blocks removed
+        ax.errorbar(x - 0.16, pm, yerr=ps, color=PUB, lw=2.2, marker="o", ms=8, capsize=3, zorder=3)
+        ax.errorbar(x, om, yerr=os_, color=OURS, lw=0, elinewidth=1.4, marker="D", ms=8,
+                    capsize=3, zorder=4, mec="white", mew=0.9)
         if noevo is not None:
             nm, ns = zip(*noevo[m])
-            ax.errorbar(x + 0.24, nm, yerr=ns, color=OURS, lw=0, elinewidth=1.0, marker="D", ms=6.5,
-                        mfc="white", mec=OURS, mew=1.4, capsize=2, zorder=5)
+            ax.errorbar(x + 0.16, nm, yerr=ns, color=OURS, lw=0, elinewidth=1.2, marker="D", ms=8,
+                        mfc="white", mec=OURS, mew=1.6, capsize=3, zorder=5)
         ax.set_xticks(x)
-        ax.set_xticklabels([f"{T}" for T in TEMPS], fontsize=8.8, color=INK)
-        ax.set_xlabel("temperature (K)", color=INK_2, fontsize=8.8)
-        ax.set_title(TITLES[m], loc="left", fontsize=11, color=INK)
+        ax.set_xticklabels([f"{T}" for T in TEMPS], fontsize=10, color=INK)
+        ax.set_xlim(-0.55, len(TEMPS) - 0.45)
+        ax.set_xlabel("temperature (K)", color=INK_2, fontsize=10)
+        if i % 3 == 0:
+            ax.set_ylabel("score", color=INK_2, fontsize=11)
+        ax.set_title(TITLES[m], loc="left", fontsize=12.5, color=INK)
         ax.grid(axis="y", color=GRID, lw=0.7, zorder=0)
         ax.set_axisbelow(True)
         for side in ("top", "right"):
             ax.spines[side].set_visible(False)
         for side in ("left", "bottom"):
             ax.spines[side].set_color(GRID)
-        ax.tick_params(colors=INK_2, labelsize=8.5, length=0)
+        ax.tick_params(colors=INK_2, labelsize=9.5, length=0)
         lo = min(min(pm), min(om))
         hi = max(max(pm), max(om))
         pad = (hi - lo) * 0.18 + 0.01
         ax.set_ylim(lo - pad, min(1.0, hi + pad) if m != "recall" else 1.005)
     from matplotlib.lines import Line2D
-    fig.legend(handles=[
-        Line2D([], [], color=PUB, lw=2.2, marker="o", ms=7, label="published (SI Table 6, mdCATH test, 270 domains)"),
-        Line2D([], [], color=OURS, lw=0, marker="D", ms=6, label="released V2 weights, scored with the paper's protocol"),
+    leg_ax = grid.ravel()[len(PUBLISHED)]          # the free sixth cell holds the legend
+    leg_ax.axis("off")
+    leg_ax.legend(handles=[
+        Line2D([], [], color=PUB, lw=2.2, marker="o", ms=8, label="published\n(SI Table 6, mdCATH test, 270 domains)"),
+        Line2D([], [], color=OURS, lw=0, marker="D", ms=8, label="released weights,\nscored with the paper's protocol"),
         ]
-        + ([Line2D([], [], color=OURS, lw=0, marker="D", ms=6.5, mfc="white", mew=1.4,
-                   label="paper's protocol, Evoformer blocks removed (not retrained)")] if noevo is not None else []),
-        loc="upper left", bbox_to_anchor=(0.04, 0.81), ncol=4 if noevo is not None else 3, frameon=False, fontsize=8.8 if noevo is not None else 9.2, labelcolor=INK)
-    fig.text(0.01, 0.985, "ESMDynamic with publicly available weights reproduce SI Table 6 at every temperature",
+        + ([Line2D([], [], color=OURS, lw=0, marker="D", ms=8, mfc="white", mew=1.6,
+                   label="paper's protocol, Evoformer blocks\nremoved (not retrained)")] if noevo is not None else []),
+        loc="center left", frameon=False, fontsize=11, labelcolor=INK, labelspacing=1.6, handlelength=2.4)
+    fig.text(0.01, 0.99, "Reproducing ESM-Dynamic's MDCath Dynamic Contact Prediction Results Across Temperatures Using Released Weights",
              fontsize=14.5, color=INK, va="top")
-    fig.text(0.01, 0.93, "Released V2 weights (Illinois Data Bank 7odsk, sha256 b41a1a22…), each test domain predicted at full "
+    fig.text(0.01, 0.955, "Released weights, each test domain predicted at full "
              "length; mean ± standard error over domains. Paper's protocol: residue pairs ≥ 3 apart in sequence, symmetrised "
              "probability > 0.5,\nbalanced accuracy per protein as scikit-learn computes it (a domain with no non-dynamic "
              f"pairs, {', '.join(str(n) for n in nonneg)} of 270 at 320–450 K, scores its recall alone). "

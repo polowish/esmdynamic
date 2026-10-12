@@ -43,15 +43,16 @@ def main():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(1, 6, figsize=(17, 4.6), facecolor="white")
-    fig.subplots_adjust(top=0.70, bottom=0.08, left=0.035, right=0.995, wspace=0.38)
+    fig, grid = plt.subplots(2, 3, figsize=(14, 9.4), facecolor="white")
+    fig.subplots_adjust(top=0.80, bottom=0.04, left=0.06, right=0.985, wspace=0.26, hspace=0.30)
+    axes = grid.ravel()
     series = [(PUB, None, lambda m: tuple(pub[m])),
               (OURS, None, lambda m: (paper_protocol[m]["mean"], paper_protocol[m]["se"]))]
     noevo = None
     if Path(args.noevo).exists():
         noevo = json.loads(Path(args.noevo).read_text())["summary"]["crop256/unsym/320K"]
         series.append(("white", OURS, lambda m: (noevo[m]["mean"], noevo[m]["se"])))
-    for ax, (m, title) in zip(axes, METRICS):
+    for k, (ax, (m, title)) in enumerate(zip(axes, METRICS)):
         vals = [get(m) for _, _, get in series]
         top = max(v + se for v, se in vals)
         for i, ((col, hatch_col, _), (v, se)) in enumerate(zip(series, vals)):
@@ -59,31 +60,35 @@ def main():
                 ax.bar(i, v, width=0.72, color="white", zorder=3, edgecolor=hatch_col, linewidth=1.4, hatch="////")
             else:
                 ax.bar(i, v, width=0.72, color=col, zorder=3, edgecolor="white", linewidth=1.5)
-            ax.errorbar(i, v, yerr=se, color=INK, capsize=3, elinewidth=1, zorder=4)
-            ax.text(i, v + se + top * 0.02, f"{v:.3f}", ha="center", va="bottom", fontsize=8.6, color=INK)
+            ax.errorbar(i, v, yerr=se, color=INK, capsize=4, elinewidth=1.1, zorder=4)
+            ax.text(i, v + se + top * 0.02, f"{v:.3f}", ha="center", va="bottom", fontsize=10.5, color=INK)
         ax.set_ylim(0, top * 1.16)
         ax.set_xticks([])
-        ax.set_title(title, loc="left", fontsize=11, color=INK)
+        if k % 3 == 0:
+            ax.set_ylabel("score", color=INK_2, fontsize=11)
+        ax.set_title(title, loc="left", fontsize=12.5, color=INK)
         ax.grid(axis="y", color=GRID, lw=0.7, zorder=0)
         ax.set_axisbelow(True)
         for side in ("top", "right"):
             ax.spines[side].set_visible(False)
         for side in ("left", "bottom"):
             ax.spines[side].set_color(GRID)
-        ax.tick_params(colors=INK_2, labelsize=8.3, length=0)
+        ax.tick_params(colors=INK_2, labelsize=9.5, length=0)
     from matplotlib.patches import Patch
     fig.legend(handles=[Patch(color=PUB, label="published (Table 2, ATLAS test, 82 chains)"),
-                        Patch(color=OURS, label="released V2 weights, scored with the protocol that reproduces the paper"),
+                        Patch(color=OURS, label="released weights, scored as the paper (train.py protocol)"),
                         ]
-               + ([Patch(fc="white", ec=OURS, hatch="////", label="protocol as orange, Evoformer blocks removed (not retrained)")]
+               + ([Patch(fc="white", ec=OURS, hatch="////", label="same, Evoformer blocks removed (not retrained)")]
                   if noevo is not None else []),
-               loc="upper left", bbox_to_anchor=(0.035, 0.86), ncol=4 if noevo is not None else 3, frameon=False,
-               fontsize=8.6 if noevo is not None else 9.2, labelcolor=INK)
-    fig.text(0.01, 0.985, "The downloaded ESMDynamic weights reproduce Table 2 (ATLAS)", fontsize=14.5, color=INK, va="top")
-    fig.text(0.01, 0.93, "Released V2 weights (Illinois Data Bank 7odsk, sha256 b41a1a22…), 320 K output against the 300 K "
+               loc="upper left", bbox_to_anchor=(0.055, 0.875), ncol=3, frameon=False, fontsize=10, labelcolor=INK,
+               handlelength=2.0, columnspacing=1.6)
+    fig.text(0.01, 0.99, "Reproducing ESM-Dynamic's ATLAS Dynamic Contact Prediction Results Using Released Weights",
+             fontsize=14.5, color=INK, va="top")
+    fig.text(0.01, 0.955, "Released weights, 320 K output against the 300 K "
              "ATLAS ensembles; mean ± standard error over 82 chains. Orange: scored as train.py scores (256-residue random "
              "crops,\nraw logits > 0.5), the only protocol that matches all six metrics within one standard error. "
-             "Hatched: the Evoformer blocks deleted from every head, not retrained: identical to orange for every chain, to the last digit. Note 12, jobs 2158167 and 2200604.",
+             "Hatched: the Evoformer blocks deleted from every head, not retrained:\nidentical to orange for every chain, to "
+             "the last digit. Note 12, jobs 2158167 and 2200604.",
              fontsize=8.8, color=INK_2, va="top", linespacing=1.45)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
