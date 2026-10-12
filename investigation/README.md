@@ -18,7 +18,7 @@ passes stops all gradient reaching the blocks during training. Full evidence and
 |---|---|
 | `notes/` | numbered write-ups, one per check (`01_preprint_review.md`, ...) |
 | `scripts/` | scripts for the checks on this branch (run from the repo root) |
-| `plans/` | plans for work not started yet: `01_head_training.md` (overview), `02_retraining_protocol.md` (the authors' recipe, step by step) |
+| `plans/` | plans for work not started yet: `01_head_training.md` (overview), `02_retraining_protocol.md` (the authors' recipe, step by step), `03_cheap_trial.md` (a ~25 GPU-h first answer + the evaluations) |
 | `notebooks/` | `inspect_weights.ipynb`: check the released weights by hand on a laptop CPU (no GPU, no ESMDynamic install) |
 | `results/` | small machine-readable outputs (json/csv); large data stays out of git |
 | `figures/evidence/` | the figures in `EVIDENCE.md` (E0–E8), one claim each |
