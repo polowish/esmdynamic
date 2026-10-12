@@ -181,11 +181,12 @@ cannot run against the current model code: `forward`'s native-contact step (adde
    `train.py`, bf16 autocast on? Is there any internal checkpoint whose blocks moved?
 2. Which protocol produced Tables 1–2 and SI Tables 6–7? Ours matches best with the
    training code's crop-and-logits path.
-3. Did Table 1 / SI Table 6 score only residue pairs at least 3 apart in sequence? With
-   that pair set (and symmetrised probabilities) the released weights reproduce SI Table 6's
-   AUROC to the third decimal at every temperature, and its balanced accuracy at 320–379 K;
-   all L × L pairs do not (note 13). Worth stating in the paper, because at 450 K it is the
-   difference between a balanced accuracy of 0.75 and one near chance (0.52).
+3. How were Table 1 and SI Table 6 scored? We reproduce SI Table 6 in full (mean and
+   standard error, every temperature) only by scoring residue pairs at least 3 apart, with
+   symmetrised probabilities and scikit-learn's per-protein balanced accuracy, which scores a
+   protein with no non-dynamic pairs by its recall alone (note 13). At 450 K that is 14 small
+   domains each scored 1.0; on the other 256 the released model's balanced accuracy is 0.517,
+   near chance. Both choices are worth stating in the paper.
 4. Could the ablation code be shared? "No DCM" as described likely also drops the pair
    transition, which would make it a different comparison from the one in the text.
 

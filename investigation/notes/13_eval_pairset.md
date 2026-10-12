@@ -57,6 +57,38 @@ mdCATH test (270 domains), `dynamic_prob` (symmetrised) thresholded at 0.5:
   because the easy near-diagonal negatives prop up specificity.
 - Nothing here touches the DCM finding.
 
-The residual high-temperature gap in balanced accuracy (0.645 vs 0.657, 0.517 vs 0.542) is 1.5–3
-standard errors; possibly a small difference in how balanced accuracy was aggregated. Worth one
-line in the message to the authors, not more.
+## The remaining balanced-accuracy gap: proteins with no negatives, scored by scikit-learn
+
+With the pair set fixed, AUROC matched exactly but balanced accuracy was still 0.012 / 0.025
+short at 413 / 450 K. AUROC is threshold-free and matched with its standard errors, so the
+predictions and pairs are right and the difference had to be in how balanced accuracy is
+computed per protein or averaged.
+
+At 450 K, 14 of the 270 test domains (small ones: 51–76 residues against a median of 119) have
+**no non-dynamic pair at |i − j| ≥ 3**: every scored pair forms and breaks contact. Specificity
+is undefined for them; this script drops them. `sklearn.metrics.balanced_accuracy_score` does
+not: it averages recall over the classes present, so for these proteins it returns the recall
+alone (verified: an all-positive protein with recall 0.96 scores 0.960, with only a
+"y_pred contains classes not in y_true" warning). The model calls every pair of these domains
+dynamic, so each scores **1.000**. `roc_auc_score` is undefined on the same proteins, so a
+NaN-skipping mean leaves them out of AUROC, which is why AUROC matched without this.
+
+Scoring them the scikit-learn way:
+
+| | 320 K | 348 K | 379 K | 413 K | 450 K |
+|---|---|---|---|---|---|
+| proteins with no negatives at \|i − j\| ≥ 3 | 0 | 0 | 1 | 7 | 14 |
+| balanced acc., published | 0.796 ± 0.007 | 0.772 ± 0.007 | 0.734 ± 0.008 | 0.657 ± 0.008 | 0.542 ± 0.007 |
+| ours, undefined proteins dropped | 0.796 ± 0.007 | 0.771 ± 0.008 | 0.732 ± 0.008 | 0.645 ± 0.008 | 0.517 ± 0.003 |
+| **ours, scikit-learn-style** | **0.796 ± 0.007** | **0.771 ± 0.008** | **0.733 ± 0.008** | **0.655 ± 0.009** | **0.542 ± 0.007** |
+| AUROC proteins (defined) | 270 | 270 | 269 | 263 | 256 |
+
+**SI Table 6 is now reproduced in full**, mean and standard error, at every temperature, by the
+released weights scored on |i − j| ≥ 3 with symmetrised probabilities and scikit-learn's
+per-protein balanced accuracy.
+
+What it means for the 450 K number: 14 fully-dynamic small domains, each a trivially perfect
+1.0, lift the mean from 0.517 to 0.542. On the 256 proteins where balanced accuracy is defined,
+the released model is at 0.517, essentially chance, because it labels almost every pair at
+least 3 apart as dynamic at that temperature. Both effects inflate the high-temperature
+numbers in the same direction; neither is mentioned in the paper.
