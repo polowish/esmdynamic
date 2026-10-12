@@ -86,12 +86,12 @@ def main():
         pm, ps = zip(*PUBLISHED[m])
         om, os_ = zip(*ours[m])
         # three points per temperature, side by side: published, released, blocks removed
-        ax.errorbar(x - 0.16, pm, yerr=ps, color=PUB, lw=2.2, marker="o", ms=8, capsize=3, zorder=3)
-        ax.errorbar(x, om, yerr=os_, color=OURS, lw=0, elinewidth=1.4, marker="D", ms=8,
-                    capsize=3, zorder=4, mec="white", mew=0.9)
+        ax.errorbar(x - 0.16, pm, yerr=ps, color=PUB, lw=2.2, marker="o", ms=6.5, capsize=3, zorder=3)
+        ax.errorbar(x, om, yerr=os_, color=OURS, lw=0, elinewidth=1.4, marker="o", ms=6.5,
+                    capsize=3, zorder=4, mec=OURS, mew=1.6)
         if noevo is not None:
             nm, ns = zip(*noevo[m])
-            ax.errorbar(x + 0.16, nm, yerr=ns, color=OURS, lw=0, elinewidth=1.2, marker="D", ms=8,
+            ax.errorbar(x + 0.16, nm, yerr=ns, color=OURS, lw=0, elinewidth=1.2, marker="o", ms=6.5,
                         mfc="white", mec=OURS, mew=1.6, capsize=3, zorder=5)
         ax.set_xticks(x)
         ax.set_xticklabels([f"{T}" for T in TEMPS], fontsize=10, color=INK)
@@ -115,10 +115,10 @@ def main():
     leg_ax = grid.ravel()[len(PUBLISHED)]          # the free sixth cell holds the legend
     leg_ax.axis("off")
     leg_ax.legend(handles=[
-        Line2D([], [], color=PUB, lw=2.2, marker="o", ms=8, label="published\n(SI Table 6, mdCATH test, 270 domains)"),
-        Line2D([], [], color=OURS, lw=0, marker="D", ms=8, label="released weights,\nscored with the paper's protocol"),
+        Line2D([], [], color=PUB, lw=2.2, marker="o", ms=6.5, label="published\n(SI Table 6, mdCATH test, 270 domains)"),
+        Line2D([], [], color=OURS, lw=0, marker="o", ms=6.5, mec=OURS, mew=1.6, label="released weights,\nscored with the paper's protocol"),
         ]
-        + ([Line2D([], [], color=OURS, lw=0, marker="D", ms=8, mfc="white", mew=1.6,
+        + ([Line2D([], [], color=OURS, lw=0, marker="o", ms=6.5, mfc="white", mew=1.6,
                    label="paper's protocol, Evoformer blocks\nremoved (not retrained)")] if noevo is not None else []),
         loc="center left", frameon=False, fontsize=11, labelcolor=INK, labelspacing=1.6, handlelength=2.4)
     fig.text(0.01, 0.99, "Reproducing ESM-Dynamic's MDCath Dynamic Contact Prediction Results Across Temperatures Using Released Weights",
@@ -127,7 +127,7 @@ def main():
              "length; mean ± standard error over domains. Paper's protocol: residue pairs ≥ 3 apart in sequence, symmetrised "
              "probability > 0.5,\nbalanced accuracy per protein as scikit-learn computes it (a domain with no non-dynamic "
              f"pairs, {', '.join(str(n) for n in nonneg)} of 270 at 320–450 K, scores its recall alone). "
-             "\nHollow: the Evoformer blocks deleted from every head, not retrained: identical to the solid diamonds for every domain at every temperature, to the last digit. Note 13, jobs 2199271 and 2200605.",
+             "\nHollow: the Evoformer blocks deleted from every head, not retrained: identical to the solid circles for every domain at every temperature, to the last digit. Note 13, jobs 2199271 and 2200605.",
              fontsize=8.8, color=INK_2, va="top", linespacing=1.45)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
