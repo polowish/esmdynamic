@@ -41,4 +41,5 @@ passes stops all gradient reaching the blocks during training. Full evidence and
 | — | supplement: parameter table and ablation numbers | done — `notes/09_supplement_ablation.md` |
 | — | mdCATH test split vs SI Table 6, and the paper-comparison figure | done — 320 K reproduces (0.806 vs 0.796) — `notes/10_mdcath_test_reproduction.md` (scoring superseded by 12) |
 | — | all six metrics of Tables 1–2 under the original protocol (crop, logits, `frequency_pred`) | done — every 320 K number reproduces; RMSE gap was our output choice — `notes/12_eval_protocol.md` |
+| — | the high-temperature discrepancy: which residue pairs were scored | done — SI Table 6 scored pairs ≥ 3 apart; AUROC reproduces at every temperature — `notes/13_eval_pairset.md` |
 | 8 | released weights vs the published human-proteome predictions (if justified) | skipped — settled by checks 4 and 6 — `notes/08_proteome_check_skipped.md` |

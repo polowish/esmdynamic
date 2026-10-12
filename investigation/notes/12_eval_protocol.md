@@ -51,7 +51,11 @@ Script: `scripts/eval_protocol.py` · results: `results/12_eval_protocol_{atlas,
 - Every reading lands close; none changes a conclusion. The published results are the
   released weights' results.
 
-## Open: balanced accuracy and AUROC at 348–450 K (mdCATH, SI Table 6)
+## Resolved in note 13: balanced accuracy and AUROC at 348–450 K (mdCATH, SI Table 6)
+
+**Update:** SI Table 6 scored only pairs with |i − j| ≥ 3; with that pair set the released
+weights reproduce its AUROC to the third decimal at every temperature (note 13). The original
+analysis follows.
 
 Precision, recall, F1 and RMSE match SI Tables 6–7 at **every** temperature to within one
 se (450 K: precision 0.790 vs 0.791, recall 0.994 vs 0.994, F1 0.853 vs 0.853, RMSE 0.056 vs
