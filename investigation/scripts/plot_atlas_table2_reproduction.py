@@ -51,7 +51,6 @@ def main():
     if Path(args.noevo).exists():
         noevo = json.loads(Path(args.noevo).read_text())["summary"]["crop256/unsym/320K"]
         series.append(("white", OURS, lambda m: (noevo[m]["mean"], noevo[m]["se"])))
-    series.append((ALL, None, lambda m: (all_pairs[m]["mean"], all_pairs[m]["se"])))
     for ax, (m, title) in zip(axes, METRICS):
         vals = [get(m) for _, _, get in series]
         top = max(v + se for v, se in vals)
@@ -75,7 +74,7 @@ def main():
     from matplotlib.patches import Patch
     fig.legend(handles=[Patch(color=PUB, label="published (Table 2, ATLAS test, 82 chains)"),
                         Patch(color=OURS, label="released V2 weights, scored with the protocol that reproduces the paper"),
-                        Patch(color=ALL, label="released V2 weights, full length, all residue pairs")]
+                        ]
                + ([Patch(fc="white", ec=OURS, hatch="////", label="protocol as orange, Evoformer blocks removed (not retrained)")]
                   if noevo is not None else []),
                loc="upper left", bbox_to_anchor=(0.035, 0.86), ncol=4 if noevo is not None else 3, frameon=False,
@@ -83,8 +82,8 @@ def main():
     fig.text(0.01, 0.985, "The downloaded ESMDynamic weights reproduce Table 2 (ATLAS)", fontsize=14.5, color=INK, va="top")
     fig.text(0.01, 0.93, "Released V2 weights (Illinois Data Bank 7odsk, sha256 b41a1a22…), 320 K output against the 300 K "
              "ATLAS ensembles; mean ± standard error over 82 chains. Orange: scored as train.py scores (256-residue random "
-             "crops,\nraw logits > 0.5), the only protocol that matches all six metrics within one standard error. Grey: "
-             "full-length chains, symmetrised probability > 0.5, all residue pairs (as in the mdCATH figure). Hatched: the Evoformer\nblocks deleted from every head, not retrained: identical to orange for every chain, to the last digit. Note 12, jobs 2158167 and 2200604.",
+             "crops,\nraw logits > 0.5), the only protocol that matches all six metrics within one standard error. "
+             "Hatched: the Evoformer blocks deleted from every head, not retrained: identical to orange for every chain, to the last digit. Note 12, jobs 2158167 and 2200604.",
              fontsize=8.8, color=INK_2, va="top", linespacing=1.45)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

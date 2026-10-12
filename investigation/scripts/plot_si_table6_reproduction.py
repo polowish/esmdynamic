@@ -79,13 +79,11 @@ def main():
     import matplotlib.pyplot as plt
 
     fig, axes = plt.subplots(1, 5, figsize=(17, 4.6), facecolor="white")
-    fig.subplots_adjust(top=0.70, bottom=0.17, left=0.04, right=0.99, wspace=0.32)
+    fig.subplots_adjust(top=0.65, bottom=0.17, left=0.04, right=0.99, wspace=0.32)
     x = np.arange(len(TEMPS))
     for ax, m in zip(axes, PUBLISHED):
         pm, ps = zip(*PUBLISHED[m])
         om, os_ = zip(*ours[m])
-        am, _ = zip(*allp[m])
-        ax.plot(x, am, color=ALL, lw=1.6, ls=(0, (4, 3)), marker="o", ms=4, zorder=2)
         ax.errorbar(x, pm, yerr=ps, color=PUB, lw=2.2, marker="o", ms=7, capsize=3, zorder=3)
         ax.errorbar(x + 0.08, om, yerr=os_, color=OURS, lw=0, elinewidth=1.4, marker="D", ms=6,
                     capsize=3, zorder=4, mec="white", mew=0.8)
@@ -104,25 +102,25 @@ def main():
         for side in ("left", "bottom"):
             ax.spines[side].set_color(GRID)
         ax.tick_params(colors=INK_2, labelsize=8.5, length=0)
-        lo = min(min(pm), min(om), min(am))
-        hi = max(max(pm), max(om), max(am))
+        lo = min(min(pm), min(om))
+        hi = max(max(pm), max(om))
         pad = (hi - lo) * 0.18 + 0.01
         ax.set_ylim(lo - pad, min(1.0, hi + pad) if m != "recall" else 1.005)
     from matplotlib.lines import Line2D
     fig.legend(handles=[
         Line2D([], [], color=PUB, lw=2.2, marker="o", ms=7, label="published (SI Table 6, mdCATH test, 270 domains)"),
         Line2D([], [], color=OURS, lw=0, marker="D", ms=6, label="released V2 weights, scored with the paper's protocol"),
-        Line2D([], [], color=ALL, lw=1.6, ls=(0, (4, 3)), marker="o", ms=4, label="released V2 weights, all residue pairs")]
+        ]
         + ([Line2D([], [], color=OURS, lw=0, marker="D", ms=6.5, mfc="white", mew=1.4,
                    label="paper's protocol, Evoformer blocks removed (not retrained)")] if noevo is not None else []),
-        loc="upper left", bbox_to_anchor=(0.04, 0.86), ncol=4 if noevo is not None else 3, frameon=False, fontsize=8.8 if noevo is not None else 9.2, labelcolor=INK)
+        loc="upper left", bbox_to_anchor=(0.04, 0.81), ncol=4 if noevo is not None else 3, frameon=False, fontsize=8.8 if noevo is not None else 9.2, labelcolor=INK)
     fig.text(0.01, 0.985, "ESMDynamic with publicly available weights reproduce SI Table 6 at every temperature",
              fontsize=14.5, color=INK, va="top")
     fig.text(0.01, 0.93, "Released V2 weights (Illinois Data Bank 7odsk, sha256 b41a1a22…), each test domain predicted at full "
              "length; mean ± standard error over domains. Paper's protocol: residue pairs ≥ 3 apart in sequence, symmetrised "
              "probability > 0.5,\nbalanced accuracy per protein as scikit-learn computes it (a domain with no non-dynamic "
              f"pairs, {', '.join(str(n) for n in nonneg)} of 270 at 320–450 K, scores its recall alone). "
-             "Scoring all pairs inflates balanced accuracy and AUROC at high temperature.\nHollow: the Evoformer blocks deleted from every head, not retrained: identical to the solid diamonds for every domain at every temperature, to the last digit. Note 13, jobs 2199271 and 2200605.",
+             "\nHollow: the Evoformer blocks deleted from every head, not retrained: identical to the solid diamonds for every domain at every temperature, to the last digit. Note 13, jobs 2199271 and 2200605.",
              fontsize=8.8, color=INK_2, va="top", linespacing=1.45)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
