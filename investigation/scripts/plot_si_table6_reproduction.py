@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 INK, INK_2, MUTED, GRID = "#0b0b0b", "#52514e", "#8a8985", "#e6e5e1"
-PUB, OURS, ALL = "#2a78d6", "#eb6834", "#a8a7a2"
+PUB, OURS, ALL = "#1D3BE2", "#1DE2C4", "#a8a7a2"
 TEMPS = [320, 348, 379, 413, 450]
 PUBLISHED = {  # SI Table 6, test split: mean, se
     "bal_acc": [(0.796, .007), (.772, .007), (.734, .008), (.657, .008), (.542, .007)],

@@ -7,7 +7,7 @@ Bars per Table 2 metric, in the same colours as the mdCATH figure
 (plot_si_table6_reproduction.py):
 
   blue    published, Table 2
-  orange  released weights, scored with the protocol that reproduces the paper. For ATLAS that is
+  teal    released weights, scored with the protocol that reproduces the paper. For ATLAS that is
           train.py's own validation scoring: 256-residue random crops (5 draws per long chain),
           sigmoid of the unsymmetrised logits > 0.5, all pairs of the crop -- the only protocol
           that matches all six metrics (note 12)
@@ -22,7 +22,7 @@ import json
 from pathlib import Path
 
 INK, INK_2, MUTED, GRID = "#0b0b0b", "#52514e", "#8a8985", "#e6e5e1"
-PUB, OURS, ALL = "#2a78d6", "#eb6834", "#a8a7a2"     # as in the mdCATH figure
+PUB, OURS, ALL = "#1D3BE2", "#1DE2C4", "#a8a7a2"     # as in the mdCATH figure
 METRICS = [("bal_acc", "balanced accuracy"), ("precision", "precision"), ("recall", "recall"),
            ("f1", "F1"), ("auroc", "AUROC"), ("rmse", "occupancy RMSE")]
 
@@ -56,7 +56,7 @@ def main():
         vals = [get(m) for _, _, get in series]
         top = max(v + se for v, se in vals)
         for i, ((col, hatch_col, _), (v, se)) in enumerate(zip(series, vals)):
-            if hatch_col:   # no-Evoformer: the orange protocol, hatched
+            if hatch_col:   # no-Evoformer: the teal protocol, hatched
                 ax.bar(i, v, width=0.72, color="white", zorder=3, edgecolor=hatch_col, linewidth=1.4, hatch="////")
             else:
                 ax.bar(i, v, width=0.72, color=col, zorder=3, edgecolor="white", linewidth=1.5)
@@ -85,9 +85,9 @@ def main():
     fig.text(0.01, 0.99, "Reproducing ESM-Dynamic's ATLAS Dynamic Contact Prediction Results Using Released Weights",
              fontsize=14.5, color=INK, va="top")
     fig.text(0.01, 0.955, "Released weights, 320 K output against the 300 K "
-             "ATLAS ensembles; mean ± standard error over 82 chains. Orange: scored as train.py scores (256-residue random "
+             "ATLAS ensembles; mean ± standard error over 82 chains. Teal: scored as train.py scores (256-residue random "
              "crops,\nraw logits > 0.5), the only protocol that matches all six metrics within one standard error. "
-             "Hatched: the Evoformer blocks deleted from every head, not retrained:\nidentical to orange for every chain, to "
+             "Hatched: the Evoformer blocks deleted from every head, not retrained:\nidentical to teal for every chain, to "
              "the last digit. Note 12, jobs 2158167 and 2200604.",
              fontsize=8.8, color=INK_2, va="top", linespacing=1.45)
     out = Path(args.out)
