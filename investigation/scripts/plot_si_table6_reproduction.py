@@ -77,6 +77,7 @@ def main():
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    plt.rcParams["font.family"] = "Open Sans"   # installed in ~/Library/Fonts; falls back to the default if missing
 
     fig, grid = plt.subplots(2, 3, figsize=(14, 9.4), facecolor="white")
     fig.subplots_adjust(top=0.84, bottom=0.07, left=0.06, right=0.985, wspace=0.26, hspace=0.38)
