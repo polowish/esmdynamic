@@ -89,6 +89,20 @@ def classification(score, y):
             "auroc": auroc(score.ravel(), y.ravel())}
 
 
+def remove_evoformer_blocks(model):
+    """The 'no Evoformer' ablation, inference only: delete both TriangularSelfAttentionBlocks
+    from every head's DynamicModule. Everything else in the DCM (positional embedding,
+    recycling norms and distance embedding, 4 recycling passes) and the trained prediction
+    layers stay. With the released weights this is expected to change nothing (note 05)."""
+    import torch.nn as nn
+    n = 0
+    for head in model.heads.values():
+        n += len(head.dynamic_module.blocks)
+        head.dynamic_module.blocks = nn.ModuleList()
+    print(f"  no-Evoformer ablation: removed {n} blocks from {len(model.heads)} heads", flush=True)
+    return model
+
+
 def load_items(args):
     """-> list of (id, sequence, dyn [T, L, L] bool, occ [T, L, L]); T = 5 (mdCATH) or 1 (ATLAS)."""
     items = []
@@ -148,6 +162,8 @@ def main():
     ap.add_argument("--splits", default="investigation/data/mdcath")
     ap.add_argument("--crop-seeds", type=int, default=5)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--no-evoformer", action="store_true",
+                    help="delete the DCM Evoformer blocks from every head (inference-only ablation)")
     args = ap.parse_args()
     from esm.esmdynamic.pretrained import esmdynamic
     from esm.esmfold.v1.misc import batch_encode_sequences
@@ -155,6 +171,8 @@ def main():
     temp_index = list(range(5)) if args.dataset == "mdcath" else [0]   # ATLAS: 320 K output
     items = load_items(args)
     model = esmdynamic().cuda().eval()
+    if args.no_evoformer:
+        remove_evoformer_blocks(model)
     rows = []
     n_cropped = 0
     for k, (pid, seq, dyn, occ) in enumerate(items):
@@ -212,7 +230,7 @@ def main():
                 line += f"   {x['mean']:.3f} ± {x['se']:.3f}"
             print(line)
 
-    out = Path(args.out or f"investigation/results/12_eval_protocol_{args.dataset}.json")
+    out = Path(args.out or f"investigation/results/12_eval_protocol_{args.dataset}{'_noevoformer' if args.no_evoformer else ''}.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"dataset": args.dataset, "n_proteins": n, "n_longer_than_crop": n_cropped,
                                "crop_length": CROP, "crop_seeds": args.crop_seeds,

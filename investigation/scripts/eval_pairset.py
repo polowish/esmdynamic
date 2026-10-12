@@ -31,7 +31,8 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from eval_protocol import PUBLISHED, TEMPS, classification, load_items, mean_se, predict  # noqa: E402
+from eval_protocol import (PUBLISHED, TEMPS, classification, load_items, mean_se, predict,  # noqa: E402
+                           remove_evoformer_blocks)
 
 K = [0, 1, 2, 3, 4, 6, 12]
 METRICS = ["bal_acc", "precision", "recall", "f1", "auroc"]
@@ -43,6 +44,8 @@ def main():
     ap.add_argument("--data", default=None)
     ap.add_argument("--splits", default="investigation/data/mdcath")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--no-evoformer", action="store_true",
+                    help="delete the DCM Evoformer blocks from every head (inference-only ablation)")
     args = ap.parse_args()
     from esm.esmdynamic.pretrained import esmdynamic
     from esm.esmfold.v1.misc import batch_encode_sequences
@@ -50,6 +53,8 @@ def main():
     temp_index = list(range(5)) if args.dataset == "mdcath" else [0]
     items = load_items(args)
     model = esmdynamic().cuda().eval()
+    if args.no_evoformer:
+        remove_evoformer_blocks(model)
     rows = []
     for n, (pid, seq, dyn, _) in enumerate(items):
         L = len(seq)
@@ -93,7 +98,7 @@ def main():
             f"   k={k}: " + " ".join(f"{summary[f'{v}/k{k}/{T}K']['negatives_per_protein']:.0f}" for T in pub)
             for k in (0, 1, 3)))
 
-    out = Path(args.out or f"investigation/results/13_eval_pairset_{args.dataset}.json")
+    out = Path(args.out or f"investigation/results/13_eval_pairset_{args.dataset}{'_noevoformer' if args.no_evoformer else ''}.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"dataset": args.dataset, "k_values": K, "n_proteins": len({r["id"] for r in rows}),
                                "published": {str(T): v for T, v in pub.items()}, "summary": summary}, indent=2))
