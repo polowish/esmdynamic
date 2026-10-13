@@ -2,6 +2,8 @@
 
     python investigation/scripts/plot_atlas_table2_reproduction.py
         [--out investigation/figures/reproduction/13_atlas_table2_reproduction.png]
+    python investigation/scripts/plot_atlas_table2_reproduction.py --clean
+        (transparent, no figure title or caption, Arial -> investigation/figures/transparent/)
 
 Bars per Table 2 metric, in the same colours as the mdCATH figure
 (plot_si_table6_reproduction.py):
@@ -32,8 +34,13 @@ def main():
     ap.add_argument("--results", default="investigation/results/12_eval_protocol_atlas.json")
     ap.add_argument("--noevo", default="investigation/results/12_eval_protocol_atlas_noevoformer.json",
                     help="same run with the DCM Evoformer blocks removed (drawn if present)")
-    ap.add_argument("--out", default="investigation/figures/reproduction/13_atlas_table2_reproduction.png")
+    ap.add_argument("--out", default=None)
+    ap.add_argument("--clean", action="store_true",
+                    help="transparent background, no figure title or caption, Arial (figures/transparent/)")
     args = ap.parse_args()
+    args.out = args.out or ("investigation/figures/transparent/13_atlas_table2_reproduction.png" if args.clean
+                            else "investigation/figures/reproduction/13_atlas_table2_reproduction.png")
+    hollow = "none" if args.clean else "white"     # the hatched bar's fill stays see-through when transparent
     r = json.loads(Path(args.results).read_text())
     pub = r["published"]["320"]
     paper_protocol = r["summary"]["crop256/unsym/320K"]
@@ -42,10 +49,12 @@ def main():
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    plt.rcParams["font.family"] = "Open Sans"   # installed in ~/Library/Fonts; falls back to the default if missing
+    # Open Sans is installed in ~/Library/Fonts; Arial ships with macOS. Either falls back to the default.
+    plt.rcParams["font.family"] = "Arial" if args.clean else "Open Sans"
 
-    fig, grid = plt.subplots(2, 3, figsize=(14, 9.4), facecolor="white")
-    fig.subplots_adjust(top=0.80, bottom=0.04, left=0.06, right=0.985, wspace=0.26, hspace=0.30)
+    fig, grid = plt.subplots(2, 3, figsize=(14, 9.4 if not args.clean else 8.8), facecolor="white")
+    fig.subplots_adjust(top=0.80 if not args.clean else 0.88, bottom=0.04, left=0.06, right=0.985,
+                        wspace=0.26, hspace=0.30)
     axes = grid.ravel()
     series = [(PUB, None, lambda m: tuple(pub[m])),
               (OURS, None, lambda m: (paper_protocol[m]["mean"], paper_protocol[m]["se"]))]
@@ -58,9 +67,10 @@ def main():
         top = max(v + se for v, se in vals)
         for i, ((col, hatch_col, _), (v, se)) in enumerate(zip(series, vals)):
             if hatch_col:   # no-Evoformer: the teal protocol, hatched
-                ax.bar(i, v, width=0.72, color="white", zorder=3, edgecolor=hatch_col, linewidth=1.4, hatch="////")
+                ax.bar(i, v, width=0.72, color=hollow, zorder=3, edgecolor=hatch_col, linewidth=1.4, hatch="////")
             else:
-                ax.bar(i, v, width=0.72, color=col, zorder=3, edgecolor="white", linewidth=1.5)
+                ax.bar(i, v, width=0.72, color=col, zorder=3, edgecolor="none" if args.clean else "white",
+                       linewidth=1.5)
             ax.errorbar(i, v, yerr=se, color=INK, capsize=4, elinewidth=1.1, zorder=4)
             ax.text(i, v + se + top * 0.02, f"{v:.3f}", ha="center", va="bottom", fontsize=10.5, color=INK)
         ax.set_ylim(0, top * 1.16)
@@ -79,13 +89,14 @@ def main():
     fig.legend(handles=[Patch(color=PUB, label="published (Table 2, ATLAS test, 82 chains)"),
                         Patch(color=OURS, label="released weights, scored as the paper (train.py protocol)"),
                         ]
-               + ([Patch(fc="white", ec=OURS, hatch="////", label="same, Evoformer blocks removed (not retrained)")]
+               + ([Patch(fc=hollow, ec=OURS, hatch="////", label="same, Evoformer blocks removed (not retrained)")]
                   if noevo is not None else []),
-               loc="upper left", bbox_to_anchor=(0.055, 0.875), ncol=3, frameon=False, fontsize=10, labelcolor=INK,
+               loc="upper left", bbox_to_anchor=(0.055, 0.875 if not args.clean else 0.975), ncol=3, frameon=False, fontsize=10, labelcolor=INK,
                handlelength=2.0, columnspacing=1.6)
-    fig.text(0.01, 0.99, "Reproducing ESM-Dynamic's ATLAS Dynamic Contact Prediction Results Using Released Weights",
+    if not args.clean:
+      fig.text(0.01, 0.99, "Reproducing ESM-Dynamic's ATLAS Dynamic Contact Prediction Results Using Released Weights",
              fontsize=14.5, color=INK, va="top")
-    fig.text(0.01, 0.955, "Released weights, 320 K output against the 300 K "
+      fig.text(0.01, 0.955, "Released weights, 320 K output against the 300 K "
              "ATLAS ensembles; mean ± standard error over 82 chains. Teal: scored as train.py scores (256-residue random "
              "crops,\nraw logits > 0.5), the only protocol that matches all six metrics within one standard error. "
              "Hatched: the Evoformer blocks deleted from every head, not retrained:\nidentical to teal for every chain, to "
@@ -93,7 +104,12 @@ def main():
              fontsize=8.8, color=INK_2, va="top", linespacing=1.45)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=170, facecolor="white")
+    if args.clean:
+        for ax in grid.ravel():
+            ax.set_facecolor("none")
+        fig.savefig(out, dpi=170, transparent=True)
+    else:
+        fig.savefig(out, dpi=170, facecolor="white")
     print(out)
 
 

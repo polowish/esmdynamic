@@ -2,6 +2,8 @@
 
     python investigation/scripts/plot_si_table6_reproduction.py
         [--out investigation/figures/reproduction/13_si_table6_reproduction.png]
+    python investigation/scripts/plot_si_table6_reproduction.py --clean
+        (transparent, no figure title or caption, Arial -> investigation/figures/transparent/)
 
 From results/13_eval_pairset_mdcath_per_protein.csv (eval_pairset.py, job 2199271): the
 released weights run once per test domain, full length, then scored two ways:
@@ -45,8 +47,13 @@ def main():
     ap.add_argument("--csv", default="investigation/results/13_eval_pairset_mdcath_per_protein.csv")
     ap.add_argument("--noevo-csv", default="investigation/results/13_eval_pairset_mdcath_noevoformer_per_protein.csv",
                     help="same run with the DCM Evoformer blocks removed (drawn if present)")
-    ap.add_argument("--out", default="investigation/figures/reproduction/13_si_table6_reproduction.png")
+    ap.add_argument("--out", default=None)
+    ap.add_argument("--clean", action="store_true",
+                    help="transparent background, no figure title or caption, Arial (figures/transparent/)")
     args = ap.parse_args()
+    args.out = args.out or ("investigation/figures/transparent/13_si_table6_reproduction.png" if args.clean
+                            else "investigation/figures/reproduction/13_si_table6_reproduction.png")
+    hollow = "none" if args.clean else "white"     # hollow markers stay see-through on a transparent figure
     d = pd.read_csv(args.csv)
     d = d[d.variant == "sym"]
 
@@ -77,10 +84,12 @@ def main():
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    plt.rcParams["font.family"] = "Open Sans"   # installed in ~/Library/Fonts; falls back to the default if missing
+    # Open Sans is installed in ~/Library/Fonts; Arial ships with macOS. Either falls back to the default.
+    plt.rcParams["font.family"] = "Arial" if args.clean else "Open Sans"
 
-    fig, grid = plt.subplots(2, 3, figsize=(14, 9.4), facecolor="white")
-    fig.subplots_adjust(top=0.84, bottom=0.07, left=0.06, right=0.985, wspace=0.26, hspace=0.38)
+    fig, grid = plt.subplots(2, 3, figsize=(14, 9.4 if not args.clean else 8.6), facecolor="white")
+    fig.subplots_adjust(top=0.84 if not args.clean else 0.95, bottom=0.07, left=0.06, right=0.985,
+                        wspace=0.26, hspace=0.38)
     axes = grid.ravel()[:len(PUBLISHED)]
     x = np.arange(len(TEMPS))
     for i, (ax, m) in enumerate(zip(axes, PUBLISHED)):
@@ -93,7 +102,7 @@ def main():
         if noevo is not None:
             nm, ns = zip(*noevo[m])
             ax.errorbar(x + 0.16, nm, yerr=ns, color=OURS, lw=0, elinewidth=1.2, marker="o", ms=6.5,
-                        mfc="white", mec=OURS, mew=1.6, capsize=3, zorder=5)
+                        mfc=hollow, mec=OURS, mew=1.6, capsize=3, zorder=5)
         ax.set_xticks(x)
         ax.set_xticklabels([f"{T}" for T in TEMPS], fontsize=10, color=INK)
         ax.set_xlim(-0.55, len(TEMPS) - 0.45)
@@ -119,12 +128,13 @@ def main():
         Line2D([], [], color=PUB, lw=2.2, marker="o", ms=6.5, label="published\n(SI Table 6, mdCATH test, 270 domains)"),
         Line2D([], [], color=OURS, lw=0, marker="o", ms=6.5, mec=OURS, mew=1.6, label="released weights,\nscored with the paper's protocol"),
         ]
-        + ([Line2D([], [], color=OURS, lw=0, marker="o", ms=6.5, mfc="white", mew=1.6,
+        + ([Line2D([], [], color=OURS, lw=0, marker="o", ms=6.5, mfc=hollow, mew=1.6,
                    label="paper's protocol, Evoformer blocks\nremoved (not retrained)")] if noevo is not None else []),
         loc="center left", frameon=False, fontsize=11, labelcolor=INK, labelspacing=1.6, handlelength=2.4)
-    fig.text(0.01, 0.99, "Reproducing ESM-Dynamic's MDCath Dynamic Contact Prediction Results Across Temperatures Using Released Weights",
+    if not args.clean:
+      fig.text(0.01, 0.99, "Reproducing ESM-Dynamic's MDCath Dynamic Contact Prediction Results Across Temperatures Using Released Weights",
              fontsize=14.5, color=INK, va="top")
-    fig.text(0.01, 0.955, "Released weights, each test domain predicted at full "
+      fig.text(0.01, 0.955, "Released weights, each test domain predicted at full "
              "length; mean ± standard error over domains. Paper's protocol: residue pairs ≥ 3 apart in sequence, symmetrised "
              "probability > 0.5,\nbalanced accuracy per protein as scikit-learn computes it (a domain with no non-dynamic "
              f"pairs, {', '.join(str(n) for n in nonneg)} of 270 at 320–450 K, scores its recall alone). "
@@ -132,7 +142,12 @@ def main():
              fontsize=8.8, color=INK_2, va="top", linespacing=1.45)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=170, facecolor="white")
+    if args.clean:
+        for ax in grid.ravel():
+            ax.set_facecolor("none")
+        fig.savefig(out, dpi=170, transparent=True)
+    else:
+        fig.savefig(out, dpi=170, facecolor="white")
     print(out)
 
 
