@@ -59,6 +59,17 @@ def main():
     print(json.dumps({k: v if k != "atlas_test" else {kk: vv for kk, vv in v.items() if kk != "hits"}
                       for k, v in out.items()}, indent=1))
     Path("investigation/results/15_pretrain_overlap.json").write_text(json.dumps(out, indent=1))
+    # per-protein membership, for comparing scores on overlapping vs non-overlapping test proteins
+    with open("investigation/results/15_pretrain_overlap_members.csv", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["dataset", "id", "rcsb_split", "in_rcsb_train"])
+        for d in ids(D / "mdcath" / "test.csv"):
+            sp = rsplit.get(to_cluster.get(d), "unmapped" if d not in to_cluster else "not_in_any_split")
+            w.writerow(["mdcath", d, sp, int(sp == "train")])
+        hit = {h["name"]: h for h in hits}
+        for r in atlas:
+            sp = ",".join(sorted(hit[r["name"]]["splits"])) if r["name"] in hit else "no_match"
+            w.writerow(["atlas", r["name"], sp, int(r["name"] in hit and "train" in hit[r["name"]]["splits"])])
 
 
 if __name__ == "__main__":
