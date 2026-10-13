@@ -42,6 +42,7 @@ def main():
     args.out = args.out or ("investigation/figures/transparent/13_atlas_table2_reproduction.png" if args.clean
                             else "investigation/figures/reproduction/13_atlas_table2_reproduction.png")
     hollow = "none" if args.clean else "white"     # the hatched bar's fill stays see-through when transparent
+    fs = 1.45 if args.clean else 1.0               # text scale: larger type for slides
     r = json.loads(Path(args.results).read_text())
     pub = r["published"]["320"]
     paper_protocol = r["summary"]["crop256/unsym/320K"]
@@ -54,8 +55,8 @@ def main():
     plt.rcParams["font.family"] = "Arial" if args.clean else "Open Sans"
 
     fig, grid = plt.subplots(2, 3, figsize=(14, 9.4 if not args.clean else 8.8), facecolor="white")
-    fig.subplots_adjust(top=0.80 if not args.clean else 0.88, bottom=0.04, left=0.06, right=0.985,
-                        wspace=0.26, hspace=0.30)
+    fig.subplots_adjust(top=0.80 if not args.clean else 0.84, bottom=0.04, left=0.06, right=0.985,
+                        wspace=0.26, hspace=0.30 if not args.clean else 0.36)
     axes = grid.ravel()
     series = [(PUB, None, lambda m: tuple(pub[m])),
               (OURS, None, lambda m: (paper_protocol[m]["mean"], paper_protocol[m]["se"]))]
@@ -74,39 +75,40 @@ def main():
                        linewidth=1.5)
             ax.errorbar(i, v, yerr=se, color=INK, capsize=4, elinewidth=1.1, zorder=4)
             ax.text(i, v + se + (0.02 if args.clean else top * 0.02), f"{v:.3f}", ha="center", va="bottom",
-                    fontsize=10.5, color=INK)
+                    fontsize=10.5 * fs, color=INK)
         ax.set_ylim(0, top * 1.16)
         if args.clean:       # one shared 0-1 scale across panels
             ax.set_ylim(0, 1)
             ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
         ax.set_xticks([])
         if k % 3 == 0:
-            ax.set_ylabel("score", color=INK_2, fontsize=11)
-        ax.set_title(title, loc="left", fontsize=12.5, color=INK)
+            ax.set_ylabel("score", color=INK_2, fontsize=11 * fs)
+        ax.set_title(title, loc="left", fontsize=12.5 * fs, color=INK, pad=22 if args.clean else 6)
         ax.grid(axis="y", color=GRID, lw=0.7, zorder=0)
         ax.set_axisbelow(True)
         for side in ("top", "right"):
             ax.spines[side].set_visible(False)
         for side in ("left", "bottom"):
             ax.spines[side].set_color(GRID)
-        ax.tick_params(colors=INK_2, labelsize=9.5, length=0)
+        ax.tick_params(colors=INK_2, labelsize=9.5 * fs, length=0)
     from matplotlib.patches import Patch
-    fig.legend(handles=[Patch(color=PUB, label="published (Table 2, ATLAS test, 82 chains)"),
-                        Patch(color=OURS, label="released weights, scored as the paper (train.py protocol)"),
+    nl = "\n" if args.clean else " "       # two-line labels keep the larger legend inside the figure
+    fig.legend(handles=[Patch(color=PUB, label=f"published{nl}(Table 2, ATLAS test, 82 chains)"),
+                        Patch(color=OURS, label=f"released weights, scored as{nl}the paper (train.py protocol)"),
                         ]
-               + ([Patch(fc=hollow, ec=OURS, hatch="////", label="same, Evoformer blocks removed (not retrained)")]
+               + ([Patch(fc=hollow, ec=OURS, hatch="////", label=f"same, Evoformer blocks{nl}removed (not retrained)")]
                   if noevo is not None else []),
-               loc="upper left", bbox_to_anchor=(0.055, 0.875 if not args.clean else 0.975), ncol=3, frameon=False, fontsize=10, labelcolor=INK,
+               loc="upper left", bbox_to_anchor=(0.055, 0.875 if not args.clean else 0.975), ncol=3, frameon=False, fontsize=10 * fs, labelcolor=INK,
                handlelength=2.0, columnspacing=1.6)
     if not args.clean:
       fig.text(0.01, 0.99, "Reproducing ESM-Dynamic's ATLAS Dynamic Contact Prediction Results Using Released Weights",
-             fontsize=14.5, color=INK, va="top")
+             fontsize=14.5 * fs, color=INK, va="top")
       fig.text(0.01, 0.955, "Released weights, 320 K output against the 300 K "
              "ATLAS ensembles; mean ± standard error over 82 chains. Teal: scored as train.py scores (256-residue random "
              "crops,\nraw logits > 0.5), the only protocol that matches all six metrics within one standard error. "
              "Hatched: the Evoformer blocks deleted from every head, not retrained:\nidentical to teal for every chain, to "
              "the last digit. Note 12, jobs 2158167 and 2200604.",
-             fontsize=8.8, color=INK_2, va="top", linespacing=1.45)
+             fontsize=8.8 * fs, color=INK_2, va="top", linespacing=1.45)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     if args.clean:

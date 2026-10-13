@@ -55,6 +55,7 @@ def main():
     args.out = args.out or ("investigation/figures/transparent/13_si_table6_reproduction.png" if args.clean
                             else "investigation/figures/reproduction/13_si_table6_reproduction.png")
     hollow = "none" if args.clean else "white"     # hollow markers stay see-through on a transparent figure
+    fs = 1.45 if args.clean else 1.0               # text scale: larger type for slides
     d = pd.read_csv(args.csv)
     d = d[d.variant == "sym"]
 
@@ -89,7 +90,7 @@ def main():
     plt.rcParams["font.family"] = "Arial" if args.clean else "Open Sans"
 
     fig, grid = plt.subplots(2, 3, figsize=(14, 9.4 if not args.clean else 8.6), facecolor="white")
-    fig.subplots_adjust(top=0.84 if not args.clean else 0.95, bottom=0.07, left=0.06, right=0.985,
+    fig.subplots_adjust(top=0.84 if not args.clean else 0.93, bottom=0.07, left=0.06, right=0.985,
                         wspace=0.26, hspace=0.38)
     axes = grid.ravel()[:len(PUBLISHED)]
     x = np.arange(len(TEMPS))
@@ -105,19 +106,19 @@ def main():
             ax.errorbar(x + 0.16, nm, yerr=ns, color=OURS, lw=0, elinewidth=1.2, marker="o", ms=6.5,
                         mfc=hollow, mec=OURS, mew=1.6, capsize=3, zorder=5)
         ax.set_xticks(x)
-        ax.set_xticklabels([f"{T}" for T in TEMPS], fontsize=10, color=INK)
+        ax.set_xticklabels([f"{T}" for T in TEMPS], fontsize=10 * fs, color=INK)
         ax.set_xlim(-0.55, len(TEMPS) - 0.45)
-        ax.set_xlabel("temperature (K)", color=INK_2, fontsize=10)
+        ax.set_xlabel("temperature (K)", color=INK_2, fontsize=10 * fs)
         if i % 3 == 0:
-            ax.set_ylabel("score", color=INK_2, fontsize=11)
-        ax.set_title(TITLES[m], loc="left", fontsize=12.5, color=INK)
+            ax.set_ylabel("score", color=INK_2, fontsize=11 * fs)
+        ax.set_title(TITLES[m], loc="left", fontsize=12.5 * fs, color=INK, pad=12 if args.clean else 6)
         ax.grid(axis="y", color=GRID, lw=0.7, zorder=0)
         ax.set_axisbelow(True)
         for side in ("top", "right"):
             ax.spines[side].set_visible(False)
         for side in ("left", "bottom"):
             ax.spines[side].set_color(GRID)
-        ax.tick_params(colors=INK_2, labelsize=9.5, length=0)
+        ax.tick_params(colors=INK_2, labelsize=9.5 * fs, length=0)
         lo = min(min(pm), min(om))
         hi = max(max(pm), max(om))
         pad = (hi - lo) * 0.18 + 0.01
@@ -131,21 +132,24 @@ def main():
     leg_ax = grid.ravel()[len(PUBLISHED)]          # the free sixth cell holds the legend
     leg_ax.axis("off")
     leg_ax.legend(handles=[
-        Line2D([], [], color=PUB, lw=2.2, marker="o", ms=6.5, label="published\n(SI Table 6, mdCATH test, 270 domains)"),
+        Line2D([], [], color=PUB, lw=2.2, marker="o", ms=6.5,
+               label="published\n(SI Table 6, mdCATH test,\n270 domains)" if args.clean else "published\n(SI Table 6, mdCATH test, 270 domains)"),
         Line2D([], [], color=OURS, lw=0, marker="o", ms=6.5, mec=OURS, mew=1.6, label="released weights,\nscored with the paper's protocol"),
         ]
         + ([Line2D([], [], color=OURS, lw=0, marker="o", ms=6.5, mfc=hollow, mew=1.6,
-                   label="paper's protocol, Evoformer blocks\nremoved (not retrained)")] if noevo is not None else []),
-        loc="center left", frameon=False, fontsize=11, labelcolor=INK, labelspacing=1.6, handlelength=2.4)
+                   label="paper's protocol, Evoformer\nblocks removed (not retrained)" if args.clean
+                   else "paper's protocol, Evoformer blocks\nremoved (not retrained)")] if noevo is not None else []),
+        loc="center left", bbox_to_anchor=(-0.08, 0.5) if args.clean else None, frameon=False,
+        fontsize=11 * fs, labelcolor=INK, labelspacing=1.6, handlelength=2.4)
     if not args.clean:
       fig.text(0.01, 0.99, "Reproducing ESM-Dynamic's MDCath Dynamic Contact Prediction Results Across Temperatures Using Released Weights",
-             fontsize=14.5, color=INK, va="top")
+             fontsize=14.5 * fs, color=INK, va="top")
       fig.text(0.01, 0.955, "Released weights, each test domain predicted at full "
              "length; mean ± standard error over domains. Paper's protocol: residue pairs ≥ 3 apart in sequence, symmetrised "
              "probability > 0.5,\nbalanced accuracy per protein as scikit-learn computes it (a domain with no non-dynamic "
              f"pairs, {', '.join(str(n) for n in nonneg)} of 270 at 320–450 K, scores its recall alone). "
              "\nHollow: the Evoformer blocks deleted from every head, not retrained: identical to the solid circles for every domain at every temperature, to the last digit. Note 13, jobs 2199271 and 2200605.",
-             fontsize=8.8, color=INK_2, va="top", linespacing=1.45)
+             fontsize=8.8 * fs, color=INK_2, va="top", linespacing=1.45)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     if args.clean:
