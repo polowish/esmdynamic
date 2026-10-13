@@ -1,7 +1,8 @@
 # Transparent figures
 
 Presentation versions of figures: transparent background, no figure title or caption, text in
-Arial. Each is made by its plot script's `--clean` option. The captioned originals live in the
+Arial, and the same 0-1 y axis in every panel (so panels compare directly; the captioned
+originals zoom each panel to its data). Each is made by its plot script's `--clean` option. The captioned originals live in the
 other folders and are the reference for what each figure shows.
 
 | file | script | captioned original |

@@ -3,7 +3,7 @@
     python investigation/scripts/plot_si_table6_reproduction.py
         [--out investigation/figures/reproduction/13_si_table6_reproduction.png]
     python investigation/scripts/plot_si_table6_reproduction.py --clean
-        (transparent, no figure title or caption, Arial -> investigation/figures/transparent/)
+        (transparent, no figure title or caption, Arial, y axis 0-1 -> investigation/figures/transparent/)
 
 From results/13_eval_pairset_mdcath_per_protein.csv (eval_pairset.py, job 2199271): the
 released weights run once per test domain, full length, then scored two ways:
@@ -49,7 +49,8 @@ def main():
                     help="same run with the DCM Evoformer blocks removed (drawn if present)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--clean", action="store_true",
-                    help="transparent background, no figure title or caption, Arial (figures/transparent/)")
+                    help="transparent background, no figure title or caption, Arial, y axis 0-1 in every panel "
+                         "(figures/transparent/)")
     args = ap.parse_args()
     args.out = args.out or ("investigation/figures/transparent/13_si_table6_reproduction.png" if args.clean
                             else "investigation/figures/reproduction/13_si_table6_reproduction.png")
@@ -121,6 +122,11 @@ def main():
         hi = max(max(pm), max(om))
         pad = (hi - lo) * 0.18 + 0.01
         ax.set_ylim(lo - pad, min(1.0, hi + pad) if m != "recall" else 1.005)
+        if args.clean:       # one shared 0-1 scale across panels
+            ax.set_ylim(0, 1)
+            ax.set_yticks(np.arange(0, 1.01, 0.2))
+            for art in ax.lines + ax.collections:
+                art.set_clip_on(False)        # markers at ~0.99 are not cut at the top edge
     from matplotlib.lines import Line2D
     leg_ax = grid.ravel()[len(PUBLISHED)]          # the free sixth cell holds the legend
     leg_ax.axis("off")

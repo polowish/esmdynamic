@@ -3,7 +3,7 @@
     python investigation/scripts/plot_atlas_table2_reproduction.py
         [--out investigation/figures/reproduction/13_atlas_table2_reproduction.png]
     python investigation/scripts/plot_atlas_table2_reproduction.py --clean
-        (transparent, no figure title or caption, Arial -> investigation/figures/transparent/)
+        (transparent, no figure title or caption, Arial, y axis 0-1 -> investigation/figures/transparent/)
 
 Bars per Table 2 metric, in the same colours as the mdCATH figure
 (plot_si_table6_reproduction.py):
@@ -36,7 +36,8 @@ def main():
                     help="same run with the DCM Evoformer blocks removed (drawn if present)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--clean", action="store_true",
-                    help="transparent background, no figure title or caption, Arial (figures/transparent/)")
+                    help="transparent background, no figure title or caption, Arial, y axis 0-1 in every panel "
+                         "(figures/transparent/)")
     args = ap.parse_args()
     args.out = args.out or ("investigation/figures/transparent/13_atlas_table2_reproduction.png" if args.clean
                             else "investigation/figures/reproduction/13_atlas_table2_reproduction.png")
@@ -72,8 +73,12 @@ def main():
                 ax.bar(i, v, width=0.72, color=col, zorder=3, edgecolor="none" if args.clean else "white",
                        linewidth=1.5)
             ax.errorbar(i, v, yerr=se, color=INK, capsize=4, elinewidth=1.1, zorder=4)
-            ax.text(i, v + se + top * 0.02, f"{v:.3f}", ha="center", va="bottom", fontsize=10.5, color=INK)
+            ax.text(i, v + se + (0.02 if args.clean else top * 0.02), f"{v:.3f}", ha="center", va="bottom",
+                    fontsize=10.5, color=INK)
         ax.set_ylim(0, top * 1.16)
+        if args.clean:       # one shared 0-1 scale across panels
+            ax.set_ylim(0, 1)
+            ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
         ax.set_xticks([])
         if k % 3 == 0:
             ax.set_ylabel("score", color=INK_2, fontsize=11)
