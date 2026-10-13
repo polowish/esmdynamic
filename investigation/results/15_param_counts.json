@@ -1,0 +1,26 @@
+{
+  "dynamic": {
+    "total": 32136108,
+    "trained": 3548332,
+    "untrained": 28587776,
+    "untrained_tensors": 160
+  },
+  "kinetic": {
+    "total": 32143203,
+    "trained": 3555427,
+    "untrained": 28587776,
+    "untrained_tensors": 160
+  },
+  "frequency": {
+    "total": 31615532,
+    "trained": 53386,
+    "untrained": 31562146,
+    "untrained_tensors": 168
+  },
+  "all_heads": {
+    "total": 95894843,
+    "trained": 7157145,
+    "untrained": 88737698,
+    "untrained_tensors": 488
+  }
+}
