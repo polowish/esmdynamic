@@ -1,17 +1,16 @@
 """CPU tests for the cached retraining (plan 04, step 2). Run from the repo root in the
-ESMDynamic environment (it has openfold):
+ESMDynamic environment (it has openfold; no pytest needed, pytest also works):
 
-    python -m pytest -q investigation/tests/test_train_faithful.py
+    python investigation/tests/test_train_faithful.py [name-substring ...]
 
-Test 3 (cached features == live ESMFold) needs a GPU: test_cached_equals_live, skipped on CPU,
-run by the timing job (investigation/slurm/retrain_timing.sbatch).
+Test 3 (cached features == live ESMFold) needs a GPU and RETRAIN_TEST_CACHE: run by the timing
+job (investigation/slurm/retrain_timing.sbatch); skipped otherwise.
 """
 import os
 import sys
 from pathlib import Path
 
 import numpy as np
-import pytest
 import torch
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -42,9 +41,20 @@ def fake_structure(L=12, c_s=64, c_z=32, seed=0):
             "residue_index": torch.arange(L)[None], "mask": torch.ones(1, L, dtype=torch.long)}
 
 
+class Skip(Exception):
+    pass
+
+
 # ---- (1) arm A: no gradient reaches the block Linears; arm B: it does
-@pytest.mark.parametrize("cache_enabled", [True, False])
-def test_block_gradient_by_arm(cache_enabled):
+def test_block_gradient_arm_A():
+    _block_gradient(cache_enabled=True)
+
+
+def test_block_gradient_arm_B():
+    _block_gradient(cache_enabled=False)
+
+
+def _block_gradient(cache_enabled):
     torch.manual_seed(0)
     head = tiny_dcm_head()
     # zero-initialised output layers block gradient to everything upstream at step 0 by design;
@@ -146,20 +156,20 @@ def test_same_init_for_both_arms():
     assert all(torch.equal(a[k], b[k]) for k in a)
 
 
-@pytest.mark.skipif(not V1.exists(), reason="V1 weights not present")
 def test_v1_loads_into_stage1_head():
     """V1's 182 tensors load into the stage-1 head with strict=True: the head we pre-train is
     V1's architecture exactly (1 condition, LayerNorm + Linear prediction layer, no confidence)."""
+    if not V1.exists():
+        raise Skip("V1 weights not present")
     s1 = R.build_stage1(seed=0)
     s1.heads["dynamic"].load_state_dict(R.v1_as_stage1_sd(V1), strict=True)
 
 
 # ---- (3) cached features give the same head outputs as live ESMFold (GPU)
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs a GPU")
 def test_cached_equals_live():
     cache = os.environ.get("RETRAIN_TEST_CACHE")
-    if not cache:
-        pytest.skip("set RETRAIN_TEST_CACHE to a cache directory")
+    if not torch.cuda.is_available() or not cache:
+        raise Skip("needs a GPU and RETRAIN_TEST_CACHE")
     import esm
     from esm.esmfold.v1.misc import batch_encode_sequences
     store = R.CropStore(cache)
@@ -189,3 +199,23 @@ def test_cached_equals_live():
         worst = max(worst, d)
     print("max |prob(live) - prob(cached)| over 20 crops:", worst)
     assert worst < 2e-2
+
+
+if __name__ == "__main__":
+    names = sys.argv[1:]
+    tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)
+             and (not names or any(x in n for x in names))]
+    failed = 0
+    for n, f in tests:
+        try:
+            f()
+            print(f"PASS {n}", flush=True)
+        except Skip as e:
+            print(f"SKIP {n}: {e}", flush=True)
+        except Exception as e:  # noqa: BLE001
+            failed += 1
+            import traceback
+            traceback.print_exc()
+            print(f"FAIL {n}: {type(e).__name__}: {e}", flush=True)
+    print(f"{len(tests) - failed}/{len(tests)} passed or skipped")
+    sys.exit(1 if failed else 0)

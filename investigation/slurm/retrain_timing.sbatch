@@ -8,17 +8,18 @@
 #SBATCH -c 8
 #SBATCH -t 04:00:00
 #SBATCH -o /home/remote/smadejski/scratch/esmdyn_retrain/logs/retrain_timing_%j.out
-set -euo pipefail
+set -uo pipefail   # keep going: every section reports
 cd $HOME/scratch/github/dyn_models
 MODEL_SPEC=esmdynamic . slurm/config.sh; eval "$ENV_SETUP_EXTRACT"
 cd $HOME/scratch/github/esmdynamic-investigation
-export PYTHONPATH=$PWD:$PWD/investigation/scripts
+export PYTHONPATH=$PWD:$PWD/investigation/scripts:$HOME/scratch/pylibs/wandb
 C=$HOME/scratch/esmdyn_cache/timing
 R=$HOME/scratch/esmdyn_retrain/smoke
 rm -rf $C $R; mkdir -p $C $R
+export WANDB_DIR=$R/wandb   # smoke runs: separate from the real runs
 nvidia-smi --query-gpu=name,memory.total --format=csv
 
-echo "== CPU tests"; python -m pytest -q investigation/tests/test_train_faithful.py -k "not cached_equals_live" 2>&1 | tail -5
+echo "== CPU tests"; python investigation/tests/test_train_faithful.py 2>&1 | grep -E "PASS|FAIL|SKIP|passed|Error" | head -20
 
 echo "== small caches"
 python investigation/scripts/cache_esmfold_features.py --dataset mdcath --split train --crops-per-long 3 --seed 0 --out $C/mdcath_train --max-crops 64
@@ -27,8 +28,8 @@ python investigation/scripts/cache_esmfold_features.py --dataset rcsb --split tr
 python investigation/scripts/cache_esmfold_features.py --dataset rcsb --split val --crops-per-long 1 --seed 0 --out $C/rcsb_val --max-crops 64
 
 echo "== test 3: cached == live (train-mode pool and eval-mode pool)"
-RETRAIN_TEST_CACHE=$C/mdcath_train python -m pytest -q -s investigation/tests/test_train_faithful.py -k cached_equals_live 2>&1 | tail -4
-RETRAIN_TEST_CACHE=$C/mdcath_val   python -m pytest -q -s investigation/tests/test_train_faithful.py -k cached_equals_live 2>&1 | tail -4
+RETRAIN_TEST_CACHE=$C/mdcath_train python investigation/tests/test_train_faithful.py cached_equals_live 2>&1 | tail -4
+RETRAIN_TEST_CACHE=$C/mdcath_val   python investigation/tests/test_train_faithful.py cached_equals_live 2>&1 | tail -4
 
 echo "== timing"
 python investigation/scripts/retrain_timing.py --mdcath-cache $C/mdcath_train --rcsb-cache $C/rcsb_train --out $R/timing.json
@@ -36,9 +37,9 @@ python investigation/scripts/retrain_timing.py --mdcath-cache $C/mdcath_train --
 echo "== smoke: both stages, both arms"
 for A in A B; do
   python investigation/scripts/train_faithful.py --stage pretrain --arm $A --seed 0 --train-cache $C/rcsb_train --val-cache $C/rcsb_val \
-     --out $R/${A}_pretrain --n-train 128 --n-val 16 --max-epochs 2 --workers 2 | tail -3
+     --out $R/${A}_pretrain --n-train 128 --n-val 16 --max-epochs 2 --workers 2 --wandb-project esmdynamic-retrain-smoke --artifact-every 1 | tail -3
   python investigation/scripts/train_faithful.py --stage finetune --arm $A --seed 0 --train-cache $C/mdcath_train --val-cache $C/mdcath_val \
-     --init $R/${A}_pretrain/best.pt --out $R/${A}_finetune --n-train 128 --n-val 16 --max-epochs 3 --aux-heads-after 1 --workers 2 | tail -4
+     --init $R/${A}_pretrain/best.pt --out $R/${A}_finetune --n-train 128 --n-val 16 --max-epochs 3 --aux-heads-after 1 --workers 2 --wandb-project esmdynamic-retrain-smoke --artifact-every 1 | tail -4
 done
 echo "== plans identical across arms?"
 for s in pretrain finetune; do diff -rq $R/A_$s/plans $R/B_$s/plans && echo "$s plans identical"; done

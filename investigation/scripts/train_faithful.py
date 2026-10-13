@@ -36,6 +36,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from wandb_tracking import Tracker
 from retrain_lib import (STAGE2_FULL, STAGE2_WARM, CropStore, block_output_norms, build_stage1,
                          build_stage2, compute_loss, draw_plan, handover, loader, plan_seed,
                          provide_training_imports, run_heads, to_structure, to_targets)
@@ -81,6 +82,11 @@ def main():
     ap.add_argument("--n-val", type=int, default=None, help="override (smoke tests)")
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--wandb", choices=["offline", "online", "off"], default="offline",
+                    help="Weights & Biases tracking (compute nodes: offline, then sync)")
+    ap.add_argument("--wandb-project", default="esmdynamic-retrain")
+    ap.add_argument("--artifact-every", type=int, default=10,
+                    help="log best/last checkpoints as W&B artifacts every N epochs (and at the end)")
     ap.add_argument("--time-limit-h", type=float, default=None,
                     help="stop cleanly (after an epoch) when this much wall time is used")
     args = ap.parse_args()
@@ -116,7 +122,7 @@ def main():
     model.set_chunk_size(256)
     phases = phase_schedule(args.stage, args.aux_heads_after)
 
-    state = dict(epoch=0, phase=0, best=float("inf"), best_epoch=None, bad=0, history=[],
+    state = dict(epoch=0, global_step=0, phase=0, best=float("inf"), best_epoch=None, bad=0, history=[],
                  done=False, stop_reason=None)
     opt = torch.optim.Adam(model.heads.parameters(), lr=1e-4)
     last = out / "last.pt"
@@ -134,6 +140,9 @@ def main():
                 torch=torch.__version__, device=torch.cuda.get_device_name(0), batch=BATCH)
     (out / "run_meta.json").write_text(json.dumps(meta, indent=2))
     steplog = open(out / "steps.jsonl", "a")
+    tracker = Tracker(args.wandb, args.wandb_project, out, run_name=out.name, group=f"seed{args.seed}",
+                      tags=[args.stage, f"arm{args.arm}"], config=meta, model=model,
+                      artifact_every=args.artifact_every)
 
     def save(path, extra=None):
         tmp = Path(str(path) + ".tmp")
@@ -167,11 +176,13 @@ def main():
                 opt.step()
                 opt.zero_grad()
                 step += 1
+                state["global_step"] += 1
                 rec_log = dict(epoch=e + 1, phase=phase_name, step=step, samples=n_acc,
                                loss=acc_loss / n_acc, **{f"loss_{h}": v / n_acc for h, v in acc_heads.items()},
                                **{f"block_norm_{k}": v for k, v in block_output_norms(model).items()},
                                t=time.time() - t0)
                 steplog.write(json.dumps(rec_log) + "\n")
+                tracker.step(rec_log, state["global_step"])
                 ep_loss += acc_loss; ep_n += n_acc
                 for h in loss_heads:
                     ep_heads[h] += acc_heads[h]
@@ -225,13 +236,16 @@ def main():
             state.update(done=True, stop_reason=f"epoch cap {cfg['max_epochs']} reached (cap binds)")
         save(last, {"opt": opt.state_dict(), "state": state})
         (out / "history.json").write_text(json.dumps(state["history"], indent=1))
+        tracker.epoch(hist, model, state["global_step"])
         if args.time_limit_h and not state["done"]:
             if time.time() - t_job + 1.5 * (hist["t_train"] + hist["t_val"]) > args.time_limit_h * 3600:
                 print("time limit: stopping after this epoch; resume with --resume", flush=True)
+                tracker.finish(final=False)
                 return
     print("finished:", state["stop_reason"], "best epoch", state["best_epoch"], "val", state["best"])
-    (out / "DONE").write_text(json.dumps(dict(stop_reason=state["stop_reason"],
-                                              best_epoch=state["best_epoch"], best_val=state["best"])))
+    summary = dict(stop_reason=state["stop_reason"], best_epoch=state["best_epoch"], best_val=state["best"])
+    (out / "DONE").write_text(json.dumps(summary))
+    tracker.finish(summary)
 
 
 if __name__ == "__main__":
