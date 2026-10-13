@@ -8,9 +8,9 @@
 #SBATCH -c 8
 #SBATCH -t 03:00:00
 #SBATCH -o /home/remote/smadejski/scratch/esmdyn_retrain/logs/retrain_timing_%j.out
-set -uo pipefail   # keep going: every section reports
 cd $HOME/scratch/github/dyn_models
 MODEL_SPEC=esmdynamic . slurm/config.sh; eval "$ENV_SETUP_EXTRACT"
+set -uo pipefail   # after activation (conda's cuda-nvcc activate script reads unset variables); no -e: every section reports
 cd $HOME/scratch/github/esmdynamic-investigation
 export PYTHONPATH=$PWD:$PWD/investigation/scripts:$HOME/scratch/pylibs/wandb
 C=$HOME/scratch/esmdyn_cache/timing
