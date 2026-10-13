@@ -4,7 +4,8 @@ Compute nodes have no internet, so runs log OFFLINE (default) into
 ~/scratch/esmdyn_retrain/wandb; sync from the login node:
 
     WANDB_API_KEY=$(cat ~/scratch/tool_caches/wandb/api_key) \
-      PYTHONPATH=~/scratch/pylibs/wandb python -m wandb sync ~/scratch/esmdyn_retrain/wandb/wandb/offline-run-*
+      PYTHONPATH=~/scratch/pylibs/wandb python -m wandb sync --entity sophia-madejski \
+      ~/scratch/esmdyn_retrain/wandb/wandb/offline-run-*
 
 wandb itself lives in ~/scratch/pylibs/wandb (pip --target; not in the shared environment);
 every wandb directory is on scratch (nothing in $HOME).
@@ -65,7 +66,10 @@ class Tracker:
             sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
         except Exception:  # noqa: BLE001
             sha = None
-        self.run = wandb.init(project=project, id=run_id, resume="allow", name=run_name, group=group,
+        # entity: the user's PERSONAL account (their key's default is the UCSF org entity);
+        # override with WANDB_ENTITY
+        self.run = wandb.init(project=project, entity=os.environ.get("WANDB_ENTITY", "sophia-madejski"),
+                              id=run_id, resume="allow", name=run_name, group=group,
                               tags=tags, config=dict(config, git_sha=sha), dir=os.environ["WANDB_DIR"])
         self.run.define_metric("epoch/*", step_metric="epoch/epoch")
         init_path = self.out / "init_heads.pt"     # for distance-from-initialisation, survives resume
