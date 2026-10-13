@@ -15,7 +15,7 @@ cd $HOME/scratch/github/esmdynamic-investigation
 export PYTHONPATH=$PWD:$PWD/investigation/scripts:$HOME/scratch/pylibs/wandb
 C=$HOME/scratch/esmdyn_cache/timing
 R=$HOME/scratch/esmdyn_retrain/smoke
-rm -rf $C $R; mkdir -p $C $R
+rm -rf $R; mkdir -p $C $R        # caches are kept: deterministic, and existing shards are skipped
 export WANDB_DIR=$R/wandb          # smoke runs: kept apart from the real runs
 nvidia-smi --query-gpu=name,memory.total --format=csv
 git log --oneline -1

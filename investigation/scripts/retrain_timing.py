@@ -5,8 +5,9 @@
 
 1. ESMFold on real mdCATH windows: seconds per window (256-residue and short), the dtypes of
    what the heads read, and how much train-mode dropout (train.py's model.train() reaches
-   ESMFold) changes (a) the features and (b) the released model's dynamic-contact probabilities,
-   next to two yardsticks: run-to-run repeat in eval mode, and bf16-vs-fp32 ESMFold.
+   ESMFold) changes (a) the features and (b) the released model's dynamic-contact probabilities
+   (largest change, fraction of pairs crossing 0.5), next to an eval-mode repeat (ESMFold cannot
+   run without autocast: its language model is fp16).
 2. Heads on cached windows: seconds per sample (forward + backward) for option 1 (at-init,
    fixed), option 2 (all, fixed) and its control (all, bug); a validation forward; peak GPU
    memory; seconds to read a window from the cache.
@@ -55,7 +56,7 @@ def esmfold_checks(n_windows=12):
         ref, p_ref, dt = run(seq, "eval", 0)
         times["256" if len(seq) == 256 else "short"].append(dt)
         variants = {"eval_repeat": run(seq, "eval", 1), "train_seed0": run(seq, "train", 0),
-                    "train_seed1": run(seq, "train", 1), "eval_fp32": run(seq, "eval", 0, autocast=False)}
+                    "train_seed1": run(seq, "train", 1)}
         row = {"domain": ids[i], "L": len(seq)}
         for name, (st, p, _) in variants.items():
             feat = {k: float((st[k].float() - ref[k].float()).abs().max() / ref[k].float().abs().max())
@@ -72,7 +73,7 @@ def esmfold_checks(n_windows=12):
     summary = {name: dict(prob_maxdiff_median=agg(name, "prob_maxdiff"),
                           frac_pairs_flipped_median=agg(name, "frac_pairs_flipped"),
                           s_z_rel_maxdiff_median=float(np.median([r[name]["feature_rel_maxdiff"]["s_z"] for r in rows])))
-               for name in ("eval_repeat", "train_seed0", "train_seed1", "eval_fp32")}
+               for name in ("eval_repeat", "train_seed0", "train_seed1")}
     return dict(esmfold_s_per_window={k: float(np.mean(v)) for k, v in times.items() if v},
                 dtypes=dtypes, dropout_summary=summary, per_window=rows)
 

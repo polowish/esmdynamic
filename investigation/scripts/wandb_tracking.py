@@ -58,7 +58,8 @@ class Tracker:
         import wandb
         self.wandb = wandb
         id_file = self.out / "wandb_id.txt"
-        run_id = id_file.read_text().strip() if id_file.exists() else wandb.util.generate_id()
+        import secrets   # wandb 0.30 has no wandb.util.generate_id; ids are [a-z0-9]
+        run_id = id_file.read_text().strip() if id_file.exists() else secrets.token_hex(4)
         id_file.write_text(run_id)
         try:
             sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
