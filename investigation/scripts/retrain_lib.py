@@ -216,13 +216,23 @@ STAGE1_HEAD = dict(name="dynamic", task_type="classification", n_conditions=1, n
                    use_confidence_head=False, use_residual_head=False)
 
 
+def seed_all(seed):
+    """torch AND numpy: openfold initialises the triangle-update projections (linear_a_p /
+    linear_b_p, 8 tensors per head) with scipy's truncnorm, which draws from numpy's global RNG;
+    seeding torch alone gave the two arms different initial blocks."""
+    import random
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+
 def build_stage1(seed):
     """Stage-1 model: the dynamic head only, one condition, and V1's prediction layer
     (LayerNorm(128) + Linear(128 -> 1); V1 keys prediction_layer.0/.1). The current
     DynamicHead only has a bare Linear, so the layer is swapped in here, under the name
     DynamicHead.forward calls (`prediction_linear`). Inferred from V1's weight shapes."""
     from esm.esmdynamic.esmdynamic import ESMDynamic
-    torch.manual_seed(seed)
+    seed_all(seed)
     m = ESMDynamic(load_esmfold=False, head_definitions=[dict(STAGE1_HEAD)])
     m.heads["dynamic"].prediction_linear = nn.Sequential(nn.LayerNorm(128), nn.Linear(128, 1))
     return m
@@ -231,7 +241,7 @@ def build_stage1(seed):
 def build_stage2(seed):
     """Stage-2 model: the three released heads (5 conditions), freshly initialised."""
     from esm.esmdynamic.esmdynamic import ESMDynamic
-    torch.manual_seed(seed)
+    seed_all(seed)
     return ESMDynamic(load_esmfold=False)
 
 

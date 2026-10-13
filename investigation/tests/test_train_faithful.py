@@ -152,8 +152,12 @@ def test_handover_exact():
 
 
 def test_same_init_for_both_arms():
-    a, b = R.build_stage1(seed=0).state_dict(), R.build_stage1(seed=0).state_dict()
-    assert all(torch.equal(a[k], b[k]) for k in a)
+    for build in (R.build_stage1, R.build_stage2):
+        a = build(seed=0).state_dict()
+        np.random.rand(7); torch.rand(3)                 # disturb both global RNGs in between
+        b = build(seed=0).state_dict()
+        diff = [k for k in a if not torch.equal(a[k], b[k])]
+        assert not diff, diff[:5]
 
 
 def test_v1_loads_into_stage1_head():
