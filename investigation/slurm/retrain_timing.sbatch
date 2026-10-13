@@ -1,12 +1,12 @@
 #!/bin/bash
-# Plan 04 step 3: tests, small caches, timing, and an end-to-end smoke run of both stages, both arms.
-#   sbatch investigation/slurm/retrain_timing.sbatch      (from the investigation worktree)
+# Plan 05 step 3: tests, a small window cache, timing, and a smoke run of option 1, option 2 and
+# its control.   sbatch investigation/slurm/retrain_timing.sbatch   (from the investigation worktree)
 #SBATCH -J retrain_timing
 #SBATCH -p gpu
 #SBATCH --gres=gpu:nvidia_l40s:1
 #SBATCH --mem=48G
 #SBATCH -c 8
-#SBATCH -t 04:00:00
+#SBATCH -t 03:00:00
 #SBATCH -o /home/remote/smadejski/scratch/esmdyn_retrain/logs/retrain_timing_%j.out
 set -uo pipefail   # keep going: every section reports
 cd $HOME/scratch/github/dyn_models
@@ -16,39 +16,47 @@ export PYTHONPATH=$PWD:$PWD/investigation/scripts:$HOME/scratch/pylibs/wandb
 C=$HOME/scratch/esmdyn_cache/timing
 R=$HOME/scratch/esmdyn_retrain/smoke
 rm -rf $C $R; mkdir -p $C $R
-export WANDB_DIR=$R/wandb   # smoke runs: separate from the real runs
+export WANDB_DIR=$R/wandb          # smoke runs: kept apart from the real runs
 nvidia-smi --query-gpu=name,memory.total --format=csv
+git log --oneline -1
 
-echo "== CPU tests"; python investigation/tests/test_train_faithful.py 2>&1 | grep -E "PASS|FAIL|SKIP|passed|Error" | head -20
+echo "== tests (CPU parts)"
+python investigation/tests/test_retrain.py 2>&1 | grep -E "^(PASS|FAIL|SKIP)|passed|Error"
 
-echo "== small caches"
-python investigation/scripts/cache_esmfold_features.py --dataset mdcath --split train --crops-per-long 3 --seed 0 --out $C/mdcath_train --max-crops 64
-python investigation/scripts/cache_esmfold_features.py --dataset mdcath --split val --crops-per-long 1 --seed 0 --out $C/mdcath_val --max-crops 64
-python investigation/scripts/cache_esmfold_features.py --dataset rcsb --split train --crops-per-long 2 --seed 0 --out $C/rcsb_train --max-crops 64
-python investigation/scripts/cache_esmfold_features.py --dataset rcsb --split val --crops-per-long 1 --seed 0 --out $C/rcsb_val --max-crops 64
+echo "== small caches (eval-mode ESMFold)"
+for args in "train all 96 0 mdcath_train" "val fixed 24 0 mdcath_val" "val fixed 16 256 long256"; do set -- $args
+  python investigation/scripts/cache_esmfold_features.py --split $1 --windows $2 --esmfold-mode eval \
+      --out $C/$5 --max-windows $3 --min-length $4 --plan-only | tail -1
+  python investigation/scripts/cache_esmfold_features.py --split $1 --windows $2 --esmfold-mode eval \
+      --out $C/$5 --max-windows $3 --min-length $4 | tail -1
+done
 
-echo "== test 3: cached == live (train-mode pool and eval-mode pool)"
-RETRAIN_TEST_CACHE=$C/mdcath_train python investigation/tests/test_train_faithful.py cached_equals_live 2>&1 | tail -4
-RETRAIN_TEST_CACHE=$C/mdcath_val   python investigation/tests/test_train_faithful.py cached_equals_live 2>&1 | tail -4
+echo "== cached == live"
+RETRAIN_TEST_CACHE=$C/mdcath_train python investigation/tests/test_retrain.py cached_equals_live 2>&1 | tail -3
 
 echo "== timing"
-python investigation/scripts/retrain_timing.py --mdcath-cache $C/mdcath_train --rcsb-cache $C/rcsb_train --out $R/timing.json
+python investigation/scripts/retrain_timing.py --train-cache $C/mdcath_train --val-cache $C/mdcath_val \
+    --long-cache $C/long256 --out $R/timing.json 2>&1 | grep -v Warning
 
-echo "== smoke: both stages, both arms"
-for A in A B; do
-  python investigation/scripts/train_faithful.py --stage pretrain --arm $A --seed 0 --train-cache $C/rcsb_train --val-cache $C/rcsb_val \
-     --out $R/${A}_pretrain --n-train 128 --n-val 16 --max-epochs 2 --workers 2 --wandb-project esmdynamic-retrain-smoke --artifact-every 1 | tail -3
-  python investigation/scripts/train_faithful.py --stage finetune --arm $A --seed 0 --train-cache $C/mdcath_train --val-cache $C/mdcath_val \
-     --init $R/${A}_pretrain/best.pt --out $R/${A}_finetune --n-train 128 --n-val 16 --max-epochs 3 --aux-heads-after 1 --workers 2 --wandb-project esmdynamic-retrain-smoke --artifact-every 1 | tail -4
-done
-echo "== plans identical across arms?"
-for s in pretrain finetune; do diff -rq $R/A_$s/plans $R/B_$s/plans && echo "$s plans identical"; done
+echo "== smoke: option 1, option 2, control (2 epochs of 128 draws, 16 val windows)"
+common="--seed 0 --train-cache $C/mdcath_train --val-cache $C/mdcath_val --n-train 128 --n-val 16 \
+        --workers 2 --wandb-project esmdynamic-retrain-smoke --artifact-every 1"
+python investigation/scripts/train_from_v2.py --trainable at-init --arm fixed $common --out $R/opt1_fixed --max-epochs 2 2>&1 | tail -2
+python investigation/scripts/train_from_v2.py --trainable all --arm fixed $common --out $R/opt2_fixed --max-epochs 2 2>&1 | tail -2
+python investigation/scripts/train_from_v2.py --trainable all --arm bug $common --out $R/opt2_bug --max-epochs 2 2>&1 | tail -2
+echo "== resume: option 1 to epoch 3"
+python investigation/scripts/train_from_v2.py --trainable at-init --arm fixed $common --out $R/opt1_fixed --max-epochs 3 --resume 2>&1 | tail -2
+echo "== draws identical across runs?"
+for e in 001 002; do cmp $R/opt1_fixed/plans/epoch_$e.npy $R/opt2_fixed/plans/epoch_$e.npy && \
+    cmp $R/opt2_fixed/plans/epoch_$e.npy $R/opt2_bug/plans/epoch_$e.npy && echo "epoch $e identical"; done
 python - <<EOF
 import json
-for a in "AB":
-    for s in ("pretrain", "finetune"):
-        h = json.load(open(f"$R/{a}_{s}/history.json"))
-        print(a, s, [(x["epoch"], x["phase"], round(x["val_loss"], 3), {k: round(v, 4) for k, v in x.items() if k.startswith("block_norm")}) for x in h])
+for r in ("opt1_fixed", "opt2_fixed", "opt2_bug"):
+    h = json.load(open("$R/" + r + "/history.json"))
+    print(r, [(x["epoch"], round(x["val_loss"], 2), round(x["val_bal_acc_320K"], 4),
+               {k[11:]: round(v, 3) for k, v in x.items() if k.startswith("block_norm_")} or x.get("block_norms"))
+              for x in h])
 EOF
+ls $R/wandb/wandb 2>/dev/null | head -5
 cp $R/timing.json investigation/results/15_timing.json
 echo DONE

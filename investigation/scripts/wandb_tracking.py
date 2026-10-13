@@ -1,4 +1,4 @@
-"""Weights & Biases tracking for train_faithful.py.
+"""Weights & Biases tracking for train_from_v2.py.
 
 Compute nodes have no internet, so runs log OFFLINE (default) into
 ~/scratch/esmdyn_retrain/wandb; sync from the login node:
