@@ -46,6 +46,9 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--no-evoformer", action="store_true",
                     help="delete the DCM Evoformer blocks from every head (inference-only ablation)")
+    ap.add_argument("--heads-checkpoint", default=None,
+                    help="retrained heads (train_faithful.py best.pt) loaded over the released ones")
+    ap.add_argument("--tag", default=None, help="suffix for the default output name")
     args = ap.parse_args()
     from esm.esmdynamic.pretrained import esmdynamic
     from esm.esmfold.v1.misc import batch_encode_sequences
@@ -53,6 +56,11 @@ def main():
     temp_index = list(range(5)) if args.dataset == "mdcath" else [0]
     items = load_items(args)
     model = esmdynamic().cuda().eval()
+    if args.heads_checkpoint:
+        import os
+        ck = torch.load(os.path.expanduser(args.heads_checkpoint), map_location="cuda", weights_only=False)
+        model.heads.load_state_dict(ck["heads"], strict=True)
+        print(f"loaded retrained heads {args.heads_checkpoint} (epoch {ck.get('epoch')})", flush=True)
     if args.no_evoformer:
         remove_evoformer_blocks(model)
     rows = []
@@ -98,7 +106,7 @@ def main():
             f"   k={k}: " + " ".join(f"{summary[f'{v}/k{k}/{T}K']['negatives_per_protein']:.0f}" for T in pub)
             for k in (0, 1, 3)))
 
-    out = Path(args.out or f"investigation/results/13_eval_pairset_{args.dataset}{'_noevoformer' if args.no_evoformer else ''}.json")
+    out = Path(args.out or f"investigation/results/13_eval_pairset_{args.dataset}{'_noevoformer' if args.no_evoformer else ''}{'_' + args.tag if args.tag else ''}.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"dataset": args.dataset, "k_values": K, "n_proteins": len({r["id"] for r in rows}),
                                "published": {str(T): v for T, v in pub.items()}, "summary": summary}, indent=2))
