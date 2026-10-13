@@ -1,6 +1,8 @@
 """The evidence figures for EVIDENCE.md: one claim per figure, each titled with its finding.
 
     python investigation/scripts/plot_evidence.py [--out investigation/figures/evidence]
+    python investigation/scripts/plot_evidence.py --clean     # E1 only, for figures/transparent/:
+        released V2 weights only, dark blue (#1D3BE2), transparent, no header, Arial, larger type
 
 Reads this branch's results/ where they exist; numbers from the dyn_models diagnostics
 (esmdyn_checkpoint_audit.py, esmdyn_update_scale.py job 2079787, esmdyn_block_grad.py job
@@ -99,6 +101,30 @@ def e1(plt, out):
            "the rest matching their random initialiser's statistics.\nOutside the blocks, only the occupancy head's per-residue path is untouched (it reaches no loss once the blocks are dead). "
            "Source: dyn_models/scripts/diagnostics/esmdyn_checkpoint_audit.py on both Illinois Data Bank files.")
     save(fig, out, "E1_block_weights_at_init.png")
+
+
+def e1_clean(plt, out):
+    """E1 for slides: the released V2 weights only, in the reproduction figures' dark blue, on a
+    transparent background with no header, Arial, larger type."""
+    plt.rcParams["font.family"] = "Arial"
+    fig, ax = plt.subplots(figsize=(11, 4.6))
+    y = np.arange(len(AUDIT))[::-1]
+    vals = [100 * a[1][0] / a[1][1] for a in AUDIT]
+    ax.barh(y, vals, height=0.56, color="#1D3BE2", zorder=3)
+    for yy, v, a in zip(y, vals, AUDIT):
+        n0, n = a[1]
+        ax.text(v + 1.2, yy, f"{n0} of {n}", va="center", fontsize=13, color=INK)
+    ax.set_yticks(y)
+    ax.set_yticklabels([a[0] for a in AUDIT], fontsize=14, color=INK)
+    ax.set_xlim(0, 114)
+    ax.set_xticks([0, 25, 50, 75, 100])
+    ax.set_xlabel("tensors still at their initial value (%)", color=INK_2, fontsize=14)
+    style(ax, "x")
+    ax.tick_params(labelsize=13)
+    ax.set_facecolor("none")
+    path = out / "E1_block_weights_at_init.png"
+    fig.savefig(path, dpi=170, bbox_inches="tight", transparent=True)
+    print(path)
 
 
 def e2(plt, out):
@@ -356,14 +382,19 @@ def e8(plt, out):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--out", default="investigation/figures/evidence")
+    ap.add_argument("--out", default=None)
+    ap.add_argument("--clean", action="store_true",
+                    help="E1 only, presentation version, into figures/transparent/")
     args = ap.parse_args()
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     plt.rcParams["font.family"] = "DejaVu Sans"
-    out = Path(args.out)
+    out = Path(args.out or ("investigation/figures/transparent" if args.clean else "investigation/figures/evidence"))
     out.mkdir(parents=True, exist_ok=True)
+    if args.clean:
+        e1_clean(plt, out)
+        return
     for f in (e1, e2, e3, e4, e5, e6, e7, e8):
         f(plt, out)
         plt.close("all")
