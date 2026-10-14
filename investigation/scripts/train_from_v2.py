@@ -126,6 +126,9 @@ def main():
         opt.load_state_dict(ck["opt"]); sched.load_state_dict(ck["sched"])
         state = ck["state"]
         print(f"resumed after epoch {state['epoch']}", flush=True)
+    if state["done"] and state["stop_reason"].startswith("epoch cap") and args.max_epochs > state["epoch"]:
+        state.update(done=False, stop_reason=None)       # the cap was raised: continue
+        print(f"cap raised to {args.max_epochs}: continuing", flush=True)
     if state["done"]:
         print("already finished:", state["stop_reason"]); return
 
