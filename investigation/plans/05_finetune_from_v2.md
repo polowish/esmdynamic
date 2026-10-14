@@ -51,9 +51,25 @@ model at step 0, and anything that changes comes from training with blocks that 
    V2's are trained.
 2. **A fixed validation set:** every val domain, one window each, drawn once, every epoch.
    It replaces 100 fresh random draws, which make early stopping noisy.
-3. **ESMFold cached, not run live.** Every possible training window is cached (35,012), so
-   draws are exactly the original's fresh crops. ESMFold's train-mode dropout cannot vary per
-   draw in a cache; the timing job measures whether it matters (eval-mode cache if it doesn't).
+3. **ESMFold cached, not run live, in eval mode.** Every possible training window is cached
+   (35,012), so draws are exactly the original's fresh crops.
+   - **Why the mode matters:** `train.py`'s `model.train()` also puts the frozen ESMFold in
+     train mode, so its structure-module dropout (0.1) is on. The noise spreads through
+     recycling, and measured on 12 mdCATH windows (job 2229389) it changes:
+     - `s_z` by about 5% (largest relative difference);
+     - the pLDDT features by about 25%;
+     - the released model's probabilities by up to 0.05–0.2;
+     - about 0.4–0.5% of pairs per window across the 0.5 threshold.
+
+     Eval mode is deterministic (repeat difference 0).
+   - **Decided with the user: eval mode.** Everything else runs ESMFold in eval mode
+     (prediction, validation, every evaluation), and nothing indicates the train-mode
+     dropout was intended. It was Meta's regulariser for training ESMFold, not a designed
+     augmentation for the heads.
+   - **Consequences:** training inputs now match test inputs, all arms see identical
+     features, and one cache serves every variant. What's given up is the incidental
+     augmentation the authors' heads had; deliberate augmentation can be added later if
+     option 2 overfits.
 4. **Optional warm-up and gradient clipping** (`--warmup-steps`, `--clip`), off by default.
    Turned on only if the smoke or timing runs show instability.
 5. **Per-epoch monitoring of the published protocol's metrics** (pairs |i−j| ≥ 3,
@@ -95,14 +111,22 @@ model at step 0, and anything that changes comes from training with blocks that 
 
 1. ✅ Code: `retrain_lib.py`, `cache_esmfold_features.py`, `train_from_v2.py`,
    `retrain_timing.py`, `tests/test_retrain.py`.
-2. Timing and smoke job (`slurm/retrain_timing.sbatch`, about 1–2 GPU-h). It measures:
+2. ✅ Timing and smoke job (`slurm/retrain_timing.sbatch`, job 2229389). It measured:
    - ESMFold seconds per window, the dtypes and the dropout effect;
    - head seconds per sample for each option;
    - disk per window;
    - and runs a smoke run of all three configurations.
 
-   **Report to the user.**
-3. Build the mdCATH cache.
+   Results:
+   - ESMFold: 1.81 s per 256-residue window, 0.85 s per short window;
+   - disk: 52.5 MB per 256-residue window;
+   - heads: 0.32–0.34 s per training sample, peak memory 12 GB;
+   - all three smoke configurations ran;
+   - the blocks move only in the fixed arms.
+
+   Reported to the user.
+3. Build the mdCATH cache, eval mode (`slurm/cache_mdcath.sbatch`): about 16.5 GPU-h and
+   1.7 TB.
 4. **With the user's go-ahead:** option 1, then evaluate and write it up; then option 2 and
    its control.
 
