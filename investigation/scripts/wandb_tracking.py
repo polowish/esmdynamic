@@ -4,7 +4,7 @@ Compute nodes have no internet, so runs log OFFLINE (default) into
 ~/scratch/esmdyn_retrain/wandb; sync from the login node:
 
     WANDB_API_KEY=$(cat ~/scratch/tool_caches/wandb/api_key) \
-      PYTHONPATH=~/scratch/pylibs/wandb python -m wandb sync \
+      PYTHONPATH=~/scratch/pylibs/wandb python -m wandb sync --entity sophia-madejski-university-of-california \
       ~/scratch/esmdyn_retrain/wandb/wandb/offline-run-*
 
 wandb itself lives in ~/scratch/pylibs/wandb (pip --target; not in the shared environment);
@@ -68,7 +68,8 @@ class Tracker:
             sha = None
         # entity: the key's default (the user's personal space, sophia-madejski-university-of-california,
         # the account's only entity); override with WANDB_ENTITY
-        self.run = wandb.init(project=project, entity=os.environ.get("WANDB_ENTITY"),
+        self.run = wandb.init(project=project,
+                              entity=os.environ.get("WANDB_ENTITY", "sophia-madejski-university-of-california"),
                               id=run_id, resume="allow", name=run_name, group=group,
                               tags=tags, config=dict(config, git_sha=sha), dir=os.environ["WANDB_DIR"])
         self.run.define_metric("epoch/*", step_metric="epoch/epoch")
