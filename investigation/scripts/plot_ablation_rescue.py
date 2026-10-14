@@ -4,10 +4,12 @@
     python investigation/scripts/plot_ablation_rescue.py --clean    # transparent, no title/caption, larger type
                                                                     #   -> figures/transparent/
 
-A  ablation (results/01_minimal_autocast_repro.json, note 04, job 2156988, L40S, bf16): a linear
-   layer used the way the DCM uses its blocks, with each of the two suspected ingredients
-   removed in turn -- the autocast weight cache, and a no_grad (recycling) pass before the
-   gradient pass. The weight gets no gradient only when both are present, as in train.py.
+A  ablation (notes 05, 12, 13; jobs 2200604 / 2200605): the released V2 model scored with its
+   Evoformer blocks deleted from every head, against the intact model, per test protein:
+   balanced accuracy for the 270 mdCATH test domains (320 K; pairs |i - j| >= 3, symmetrised,
+   scikit-learn style) and the 82 ATLAS test chains (train.py protocol). Every score is identical
+   (largest difference over every metric, temperature and protocol: 0.0), because the untrained
+   blocks are identity maps.
 B  rescue (results/07_training_check_cache_{on,off}.json, note 07, jobs 2157527 / 2157528): 500
    fine-tuning steps of ESMDynamic itself from the released V2 weights, identical batches and
    crops, differing only in autocast(cache_enabled=...). The norm of the blocks' zero-initialised
@@ -32,44 +34,58 @@ def main():
                             else "investigation/figures/gradient_flow/ablation_rescue.png"))
     fs = 1.45 if args.clean else 1.0
 
-    rep = json.loads((RES / "01_minimal_autocast_repro.json").read_text())
-    cells = {(r["cache_enabled"], r["no_grad_use_first"]): r["weight"] for r in rep["A"] if r["dtype"] == "bfloat16"}
+    import numpy as np
+    import pandas as pd
+
+    def mdcath(path):
+        d = pd.read_csv(path)
+        d = d[(d.variant == "sym") & (d.k == 3) & (d.temp == 320)].copy()
+        d["bal_acc"] = np.where(d.n_negative == 0, d.recall, d.bal_acc)
+        return d.set_index("id").bal_acc
+
+    def atlas(path):
+        d = pd.read_csv(path)
+        d = d[(d.protocol == "crop256") & (d.variant == "unsym") & (d.temp == 320)]
+        return d.groupby("id").bal_acc.mean()
+
+    md = pd.concat([mdcath(RES / "13_eval_pairset_mdcath_per_protein.csv"),
+                    mdcath(RES / "13_eval_pairset_mdcath_noevoformer_per_protein.csv")], axis=1, keys=["full", "noevo"])
+    at = pd.concat([atlas(RES / "12_eval_protocol_atlas_per_protein.csv"),
+                    atlas(RES / "12_eval_protocol_atlas_noevoformer_per_protein.csv")], axis=1, keys=["full", "noevo"])
+    max_diff = max(float((md.full - md.noevo).abs().max()), float((at.full - at.noevo).abs().max()))
     on = json.loads((RES / "07_training_check_cache_on.json").read_text())["train"]
     off = json.loads((RES / "07_training_check_cache_off.json").read_text())["train"]
 
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from matplotlib.patches import FancyBboxPatch, Patch
     plt.rcParams["font.family"] = "Arial"
 
     fig = plt.figure(figsize=(14, 6.0 if args.clean else 6.8))
-    gs = fig.add_gridspec(1, 2, width_ratios=[1, 1.25], wspace=0.30, left=0.14, right=0.98,
-                          top=0.78 if args.clean else 0.66, bottom=0.11)
+    gs = fig.add_gridspec(1, 2, width_ratios=[1, 1.25], wspace=0.28, left=0.07, right=0.98,
+                          top=0.86 if args.clean else 0.74, bottom=0.11)
     a, b = fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1])
 
-    # A: 2 x 2 ablation grid
-    cols = [(True, "autocast\nweight cache on"), (False, "autocast weight\ncache off (the fix)")]
-    rows = [(True, "no_grad pass first\n(as in recycling)"), (False, "no no_grad\npass first")]
-    for i, (ng, rlab) in enumerate(rows):
-        for j, (ce, clab) in enumerate(cols):
-            got = cells[(ce, ng)]
-            trains = got != "none"
-            a.add_patch(FancyBboxPatch((j + 0.06, 1 - i + 0.06), 0.88, 0.88, boxstyle="round,pad=0,rounding_size=0.06",
-                                       fc=FIX if trains else BUG, ec="none"))
-            txt = "gradient reaches\nthe weight" if trains else "no gradient:\nweight never\nmoves"
-            a.text(j + 0.5, 1 - i + 0.5, txt, ha="center", va="center", fontsize=11 * fs * (0.88 if args.clean else 1),
-                   color=INK if trains else "white", fontweight="bold" if not trains else "normal", linespacing=1.15)
-            if ce and ng:
-                a.text(j + 0.5, 1 - i + 0.90, "as released", ha="center", va="top",
-                       fontsize=10 * fs, color="white", style="italic")
-    a.set_xlim(0, 2); a.set_ylim(0, 2); a.set_aspect("equal")
-    a.set_xticks([0.5, 1.5]); a.set_xticklabels([c[1] for c in cols], fontsize=11 * fs, color=INK)
-    a.set_yticks([1.5, 0.5]); a.set_yticklabels([r[1] for r in rows], fontsize=11 * fs, color=INK)
-    a.tick_params(length=0)
-    a.xaxis.set_ticks_position("top")
-    for side in a.spines.values():
-        side.set_visible(False)
+    # A: ablation -- delete the Evoformer blocks from the released model
+    lw = 1.2 if args.clean else 1
+    a.plot([0, 1], [0, 1], color=GRID, lw=1.4, zorder=1)
+    a.scatter(md.full, md.noevo, s=34 * lw, color=BUG, alpha=0.85, edgecolors="none", zorder=3,
+              label=f"mdCATH test, {len(md)} domains")
+    a.scatter(at.full, at.noevo, s=46 * lw, facecolors="none", edgecolors=BUG, linewidths=1.4, zorder=4,
+              label=f"ATLAS test, {len(at)} chains")
+    a.set_xlim(0.4, 1.0); a.set_ylim(0.4, 1.0); a.set_aspect("equal")
+    a.set_xticks([0.4, 0.6, 0.8, 1.0]); a.set_yticks([0.4, 0.6, 0.8, 1.0])
+    a.set_xlabel("balanced accuracy, released model", fontsize=11 * fs, color=INK_2)
+    a.set_ylabel("balanced accuracy, blocks removed", fontsize=11 * fs, color=INK_2)
+    a.text(0.98, 0.43, f"{len(md) + len(at)} test proteins:\nevery score identical\n(largest difference {max_diff:.1f})",
+           ha="right", va="bottom", fontsize=10.5 * fs, color=INK, linespacing=1.25)
+    a.legend(loc="upper left", frameon=False, fontsize=10 * fs, labelcolor=INK, handletextpad=0.3, borderaxespad=0.2)
+    a.grid(color=GRID, lw=0.7, zorder=0); a.set_axisbelow(True)
+    for side in ("top", "right"):
+        a.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        a.spines[side].set_color(GRID)
+    a.tick_params(colors=INK_2, labelsize=10 * fs, length=0)
 
     # B: rescue in ESMDynamic's own training
     s = [r["step"] for r in on]
@@ -90,22 +106,23 @@ def main():
     b.legend(loc="upper left", frameon=False, fontsize=11 * fs, labelcolor=INK)
 
     # panel titles at one height above both panels (A's top tick labels would collide with set_title)
-    top = 0.78 if args.clean else 0.66
-    for ax, t in ((a, "ablation: remove each ingredient"), (b, "rescue: ESMDynamic training, bug vs fix")):
-        x0 = ax.get_position().x0 if ax is b else 0.02
-        fig.text(x0, top + (0.105 if args.clean else 0.09), t, fontsize=13 * fs, color=INK, va="bottom", ha="left")
+    a.apply_aspect()                      # A is square: its frame is only known after the aspect is applied
+    y_title = max(a.get_position().y1, b.get_position().y1) + 0.03
+    for ax, t in ((a, "ablation: Evoformer blocks deleted"), (b, "rescue: ESMDynamic training, bug vs fix")):
+        fig.text(ax.get_position().x0, y_title, t, fontsize=13 * fs, color=INK, va="bottom", ha="left")
     if args.clean:
         for ax in (a, b):
             ax.set_facecolor("none")
     else:
-        fig.text(0.01, 0.99, "The autocast-cache bug is what keeps ESMDynamic's Evoformer blocks untrained: "
-                 "removing it rescues training", fontsize=14.5, color=INK, va="top")
-        fig.text(0.01, 0.945, "Left (ablation): a linear layer used as the DCM uses its blocks, bf16 autocast, each suspected "
-                 "ingredient removed in turn. The weight gets no gradient only when the weight cache and a no_grad recycling pass "
-                 "\nare both present, the setup train.py runs (note 04, job 2156988). Right (rescue): 500 fine-tuning steps of "
-                 "ESMDynamic from the released weights, identical batches and crops, differing only in "
-                 "autocast(cache_enabled=...).\nWith the bug the blocks' zero-initialised output layers stay at exactly 0; with "
-                 "the fix they train from step 1 (note 07, jobs 2157527 / 2157528).",
+        fig.text(0.01, 0.99, "ESMDynamic's Evoformer blocks do nothing in the released model, and the autocast-cache bug "
+                 "is why: removing it rescues training", fontsize=14.5, color=INK, va="top")
+        fig.text(0.01, 0.945, "Left (ablation): the released model with its Evoformer blocks deleted from every head, scored "
+                 "against the intact model on every test protein. Balanced accuracy (mdCATH: 320 K, pairs |i - j| >= 3, "
+                 "symmetrised; ATLAS: train.py protocol)\nis identical for all 352 proteins, as is every other metric at every "
+                 "temperature (notes 05, 12, 13; jobs 2200604 / 2200605). Right (rescue): 500 fine-tuning steps of ESMDynamic "
+                 "from the released weights, identical batches\nand crops, differing only in autocast(cache_enabled=...). With "
+                 "the bug the blocks' zero-initialised output layers stay at exactly 0; with the fix they train from step 1 "
+                 "(note 07, jobs 2157527 / 2157528).",
                  fontsize=9, color=INK_2, va="top", linespacing=1.45)
     out.parent.mkdir(parents=True, exist_ok=True)
     if args.clean:
