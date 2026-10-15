@@ -74,7 +74,7 @@ def _check_shard(args):
     return out
 
 
-def integrity(cache, jobs):
+def integrity(cache, jobs, progress=None):
     from multiprocessing import Pool
 
     meta = json.loads((cache / "meta.json").read_text())
@@ -98,13 +98,36 @@ def integrity(cache, jobs):
     t0 = time.time()
     work = [(cache / f"shard_{k:05d}.pt", by_shard[k]) for k in sorted(by_shard)]
     trailing, dtypes, n, nbytes = Counter(), Counter(), 0, 0
+
+    def take(res):
+        nonlocal n, nbytes, errors
+        errors += [f"{res['shard']}: {e}" for e in res["errors"][:20]]
+        trailing.update(res["trailing"]); dtypes.update(res["dtypes"])
+        n += res["n"]; nbytes += res["bytes"]
+
+    # one line per checked shard, so a run cut short by its time limit resumes where it was
+    done = set()
+    if progress is not None and progress.exists():
+        mtimes = {p.name: p.stat().st_mtime for p, _ in work}
+        for line in progress.read_text().splitlines():
+            res = json.loads(line)
+            if res.get("mtime") == mtimes.get(res["shard"]):   # shard unchanged since checked
+                res["trailing"], res["dtypes"] = Counter(res["trailing"]), Counter(res["dtypes"])
+                take(res); done.add(res["shard"])
+        print(f"  resuming: {len(done)} shards already checked", flush=True)
+    todo = [w for w in work if w[0].name not in done]
+    log = open(progress, "a") if progress is not None else None
     with Pool(jobs) as pool:
-        for i, res in enumerate(pool.imap_unordered(_check_shard, work, chunksize=4), 1):
-            errors += [f"{res['shard']}: {e}" for e in res["errors"][:20]]
-            trailing.update(res["trailing"]); dtypes.update(res["dtypes"])
-            n += res["n"]; nbytes += res["bytes"]
+        for i, res in enumerate(pool.imap_unordered(_check_shard, todo, chunksize=4), 1):
+            take(res)
+            if log is not None:
+                p = cache / res["shard"]
+                res["mtime"] = p.stat().st_mtime if p.exists() else None
+                log.write(json.dumps(res) + "\n"); log.flush()
             if i % 100 == 0:
-                print(f"  {i}/{len(work)} shards, {time.time() - t0:.0f} s", flush=True)
+                print(f"  {i}/{len(todo)} shards, {time.time() - t0:.0f} s", flush=True)
+    if log is not None:
+        log.close()
     for key in FEATS:                                     # one shape and one dtype per feature
         shapes = {s for s in trailing if s.split("(")[0] == key}
         kinds = {d for d in dtypes if d.split(":")[0] == key}
@@ -205,6 +228,93 @@ def live(cache, n, seed, tol):
             "errors": errors, "ok": not errors}
 
 
+def precision(cache, n, seed):
+    """bf16 (as cached) vs full fp32 ESMFold on this GPU, for windows written on each GPU type.
+
+    ESMFold's trunk amplifies small rounding differences, so bf16 outputs from two GPU
+    architectures can disagree a lot while both are equally valid. fp32 on one GPU is the
+    common reference: if windows written on one architecture sit much farther from it than
+    windows written on the other, that architecture's cache is suspect; if they sit at the
+    same distance, the disagreement is bf16 noise.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import esm
+    from esm.esmfold.v1.misc import batch_encode_sequences
+
+    import retrain_lib as R
+
+    meta = json.loads((cache / "meta.json").read_text())
+    tasks = {p.name: json.loads(p.read_text()) for p in sorted(cache.glob("task_*.json"))}
+    n_tasks = max(len(tasks), 1)
+    writer = {int(v["task"]): v.get("device", "?") for v in tasks.values()}
+    store = R.WindowStore(cache)
+    by_dev = defaultdict(list)
+    for wid in range(len(store)):
+        if int(store.rows[wid]["end"]) - int(store.rows[wid]["start"]) == 256:   # like for like
+            by_dev[writer.get(int(store.shard[wid]) % n_tasks, "?")].append(wid)
+    rng = random.Random(seed)
+    sample = [(d, w) for d in sorted(by_dev) for w in rng.sample(by_dev[d], min(n, len(by_dev[d])))]
+
+    fold = esm.pretrained.esmfold_v1().cuda().requires_grad_(False)
+    fold.set_chunk_size(256)
+    fold.train(meta["esmfold_mode"] == "train")
+    heads = R.load_v2(device="cuda").eval()
+    heads.set_chunk_size(256)
+    folders = Path(R.DATASETS[meta["dataset"]]["folders"])
+    keys = ("s_s", "s_z", "lm_logits", "ptm_logits", "distogram_logits", "lddt_head")
+
+    def run(aatype, mask, residx, fp32):
+        if fp32:
+            fold.float()
+            with torch.no_grad():
+                st = fold(aatype, mask, residx, None, None)
+        else:
+            with torch.no_grad(), torch.autocast("cuda", dtype=torch.bfloat16):
+                st = fold(aatype, mask, residx, None, None)
+        return {k: st[k] for k in keys}
+
+    def rel(a, b):
+        a, b = a.float(), b.float()
+        return float((a - b).norm() / b.norm().clamp_min(1e-12))
+
+    def probs(st, residx, mask):
+        s = dict(st, residue_index=residx, mask=mask)
+        with torch.no_grad():
+            return R.run_heads(heads, s, True)["dynamic_prob"].float()
+
+    # bf16 first for every window (the module is cast to fp32 once, after)
+    enc, rows = {}, []
+    for dev, wid in sample:
+        rec = store.get(wid)
+        seq = R.read_seq(folders / rec["domain"])[rec["start"]:rec["end"]]
+        enc[wid] = [x.cuda() for x in batch_encode_sequences([seq], 512, "G" * 25)[:3]]
+    bf = {wid: run(*enc[wid], False) for _, wid in sample}
+    fp = {wid: run(*enc[wid], True) for _, wid in sample}
+    heads.float()
+    for dev, wid in sample:
+        rec = store.get(wid)
+        cached = R.to_structure(rec, "cuda")
+        aatype, mask, residx = enc[wid]
+        ref = probs(fp[wid], residx, mask)
+        row = {"window_id": wid, "written_on": dev}
+        for name, st in (("cache", cached), ("bf16_here", bf[wid])):
+            for k in ("s_s", "s_z"):
+                row[f"{name}_{k}_rel_to_fp32"] = rel(st[k], fp[wid][k])
+            row[f"{name}_prob_maxdiff_to_fp32"] = float((probs(st, residx, mask) - ref).abs().max())
+        rows.append(row)
+        print(f"  w{wid:6d} written on {dev[:16]:16s} cache->fp32 s_z {row['cache_s_z_rel_to_fp32']:.3f} "
+              f"prob {row['cache_prob_maxdiff_to_fp32']:.3f} | bf16 here->fp32 s_z "
+              f"{row['bf16_here_s_z_rel_to_fp32']:.3f} prob {row['bf16_here_prob_maxdiff_to_fp32']:.3f}",
+              flush=True)
+    summary = {}
+    for dev in sorted({r["written_on"] for r in rows}):
+        rs = [r for r in rows if r["written_on"] == dev]
+        summary[dev] = {k: round(sum(r[k] for r in rs) / len(rs), 4) for k in rs[0]
+                        if k.endswith("fp32")}
+    return {"mode": "precision", "cache": str(cache), "checked_on": torch.cuda.get_device_name(0),
+            "per_writer_mean": summary, "windows": rows, "errors": [], "ok": True}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--cache", required=True)
@@ -216,10 +326,19 @@ def main():
     b.add_argument("-n", type=int, default=48, help="windows, split evenly across array tasks")
     b.add_argument("--seed", type=int, default=0)
     b.add_argument("--tol", type=float, default=1e-3, help="max |dynamic prob| difference")
+    c = sub.add_parser("precision")
+    c.add_argument("-n", type=int, default=6, help="windows per writing GPU type")
+    c.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
     cache = Path(os.path.expanduser(args.cache))
-    rep = integrity(cache, args.jobs) if args.mode == "integrity" else live(cache, args.n, args.seed, args.tol)
+    if args.mode == "integrity":
+        rep = integrity(cache, args.jobs,
+                        Path(args.report + ".progress.jsonl") if args.report else None)
+    elif args.mode == "live":
+        rep = live(cache, args.n, args.seed, args.tol)
+    else:
+        rep = precision(cache, args.n, args.seed)
     brief = {k: v for k, v in rep.items() if k != "windows"}
     print(json.dumps(brief, indent=2))
     if args.report:
