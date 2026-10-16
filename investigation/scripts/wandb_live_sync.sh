@@ -11,43 +11,47 @@
 # live, and then marked done; nothing is re-uploaded. It exits after the Slurm job name
 # (resubmissions keep it) has left the queue and every folder is done.
 #
-# The API key is read from its file into the environment, never onto a command line or into
-# the log. Every wandb directory is on scratch.
+# State is one small file per folder in live_sync/ (<folder>.pid, .rc, .done, .out), so a
+# restarted loop picks up where the last one was. The API key is read from its file into the
+# environment, never onto a command line or into the log. Every wandb directory is on scratch.
 JOB_NAME=${1:?job name, e.g. retrain_opt1}
 ENTITY=sophia-madejski-university-of-california
 ROOT=$HOME/scratch/esmdyn_retrain/wandb/wandb
-DONE=$HOME/scratch/esmdyn_retrain/wandb/live_synced.txt
+STATE=$HOME/scratch/esmdyn_retrain/wandb/live_sync
 
 module load CBI miniforge3 >/dev/null 2>&1
 conda activate $HOME/scratch/venvs/esmdynamic
-set -uo pipefail   # after activation: conda's cuda-nvcc activate script reads unset variables
+set -o pipefail     # no -u: conda's activate scripts read unset variables
 export PYTHONPATH=$HOME/scratch/pylibs/wandb
 export WANDB_CONFIG_DIR=$HOME/scratch/tool_caches/wandb/config
 export WANDB_CACHE_DIR=$HOME/scratch/tool_caches/wandb/cache
 export WANDB_DATA_DIR=$HOME/scratch/tool_caches/wandb/data
 WANDB_API_KEY=$(cat $HOME/scratch/tool_caches/wandb/api_key); export WANDB_API_KEY
-touch $DONE
-declare -A live            # folder -> pid of its live sync
+mkdir -p $STATE
 
 log() { echo "[$(date +%FT%T)] $*"; }
 log "watching $ROOT for $JOB_NAME"
 while true; do
+    active=0
     for d in $ROOT/offline-run-*; do
         [ -d "$d" ] || continue
-        b=$(basename $d)
-        grep -qx "$b" $DONE && continue
-        if [ -z "${live[$b]:-}" ]; then
-            log "live sync start: $b"
-            timeout 9h python -m wandb beta sync --live -e $ENTITY "$d" >> $DONE.$b.out 2>&1 &
-            live[$b]=$!
-        elif ! kill -0 ${live[$b]} 2>/dev/null; then
-            wait ${live[$b]}; rc=$?
-            log "live sync end: $b (exit $rc)"
-            unset "live[$b]"
-            [ $rc -eq 0 ] && echo "$b" >> $DONE      # failed: retried next pass
+        s=$STATE/$(basename $d)
+        [ -f $s.done ] && continue
+        if [ -f $s.rc ]; then                          # its sync has ended
+            rc=$(cat $s.rc)
+            log "live sync end: $(basename $d) (exit $rc)"
+            if [ "$rc" = 0 ]; then touch $s.done; else rm -f $s.rc $s.pid; fi   # failed: retry
+            continue
         fi
+        if [ -f $s.pid ] && kill -0 $(cat $s.pid) 2>/dev/null; then
+            active=$((active + 1)); continue           # still streaming
+        fi
+        log "live sync start: $(basename $d)"
+        ( timeout 9h python -m wandb beta sync --live -e $ENTITY "$d" >> $s.out 2>&1; echo $? > $s.rc ) &
+        echo $! > $s.pid
+        active=$((active + 1))
     done
-    if [ ${#live[@]} -eq 0 ] && ! squeue -u $USER -h -n $JOB_NAME 2>/dev/null | grep -q .; then
+    if [ $active -eq 0 ] && ! squeue -u $USER -h -n $JOB_NAME 2>/dev/null | grep -q .; then
         log "no $JOB_NAME in the queue and nothing left to sync: exiting"
         break
     fi
