@@ -129,6 +129,12 @@ model at step 0, and anything that changes comes from training with blocks that 
    1.7 TB.
 4. **With the user's go-ahead:** option 1, then evaluate and write it up; then option 2 and
    its control.
+   - **Status 2026-10-16:** option 1 seed 0 running (job `retrain_opt1`, from 11:59; val loss
+     −14% from V2 by epoch 43, still improving). Option 2, seed 0, both arms (`all fixed 0`,
+     `all bug 0`, job name `retrain_opt2`) is approved and queued behind it by
+     `scripts/submit_when_done.sh` on the login node (log `~/scratch/esmdyn_retrain/logs/after_opt1.log`),
+     which submits them when `runs/opt1_fixed_s0/DONE` appears and then starts their W&B live
+     sync. More seeds (and per-seed block re-initialisation) await the user's decision.
 
 ## Checks built in
 
