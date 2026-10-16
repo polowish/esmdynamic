@@ -13,7 +13,6 @@
 #
 # The API key is read from its file into the environment, never onto a command line or into
 # the log. Every wandb directory is on scratch.
-set -uo pipefail
 JOB_NAME=${1:?job name, e.g. retrain_opt1}
 ENTITY=sophia-madejski-university-of-california
 ROOT=$HOME/scratch/esmdyn_retrain/wandb/wandb
@@ -21,6 +20,7 @@ DONE=$HOME/scratch/esmdyn_retrain/wandb/live_synced.txt
 
 module load CBI miniforge3 >/dev/null 2>&1
 conda activate $HOME/scratch/venvs/esmdynamic
+set -uo pipefail   # after activation: conda's cuda-nvcc activate script reads unset variables
 export PYTHONPATH=$HOME/scratch/pylibs/wandb
 export WANDB_CONFIG_DIR=$HOME/scratch/tool_caches/wandb/config
 export WANDB_CACHE_DIR=$HOME/scratch/tool_caches/wandb/cache
