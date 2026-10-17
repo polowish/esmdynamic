@@ -10,7 +10,13 @@
 # Runs on the LOGIN node, from the investigation worktree. Arguments: the run directory to
 # wait on, the Slurm job name of its chain (train_from_v2.sbatch resubmits under the same
 # name), the job name the follow-on jobs will use (for their W&B live sync), then one quoted
-# sbatch argument string per job to submit.
+# sbatch argument string per job to submit. Give "-" as the follow-on name to skip the sync
+# hand-over: that is how it runs inside a Slurm CPU job (the login node kills background
+# processes when their ssh session ends, so a login-node watcher does not survive):
+#
+#   sbatch -p cpu -c 1 --mem=1G -t 4-00:00:00 -J after_opt1 -o ~/scratch/esmdyn_retrain/logs/after_opt1_%j.log \
+#       --wrap 'bash investigation/scripts/submit_when_done.sh <run_dir> retrain_opt1 - "<job 1>" "<job 2>"'
+
 #
 # A job id dependency cannot express this: each 8 h attempt exits 0 after resubmitting itself,
 # so `afterok` would fire after the first attempt. Instead: poll every 5 minutes; when DONE
@@ -42,5 +48,6 @@ for args in "$@"; do
     # word-splitting of each quoted job string is intended
     jid=$(sbatch --parsable $args) && log "submitted $jid: sbatch $args" || log "FAILED: sbatch $args"
 done
+[ "$NEXT" = - ] && exit 0                       # in Slurm: compute nodes cannot reach W&B
 log "starting W&B live sync for $NEXT"
 exec bash investigation/scripts/wandb_live_sync.sh $NEXT

@@ -8,8 +8,14 @@
 # ~/scratch/esmdyn_retrain/wandb/wandb/ and streams each new one with `wandb beta sync --live`
 # (which tails the .wandb file until the run finishes). Each 8 h attempt of
 # train_from_v2.sbatch resumes the same run id in a new folder, so a folder is synced once,
-# live, and then marked done; nothing is re-uploaded. It exits after the Slurm job name
-# (resubmissions keep it) has left the queue and every folder is done.
+# live, and then marked done; nothing is re-uploaded. It exits once no job whose name STARTS
+# with the given name (`retrain` covers retrain_opt1 and retrain_opt2; resubmissions keep their
+# name) is queued and every folder is done.
+#
+# The login node runs logind with KillUserProcesses=yes: everything started in an ssh session,
+# setsid/nohup included, is killed when that session ends. Compute nodes have no route to the
+# proxy (checked 2026-10-16), so this cannot move into Slurm. Restart it after reconnecting;
+# it is restart-safe (state files; W&B drops already-uploaded history steps).
 #
 # State is one small file per folder in live_sync/ (<folder>.pid, .rc, .done, .out), so a
 # restarted loop picks up where the last one was. The API key is read from its file into the
@@ -51,7 +57,7 @@ while true; do
         echo $! > $s.pid
         active=$((active + 1))
     done
-    if [ $active -eq 0 ] && ! squeue -u $USER -h -n $JOB_NAME 2>/dev/null | grep -q .; then
+    if [ $active -eq 0 ] && ! squeue -u $USER -h -o %j 2>/dev/null | grep -q "^$JOB_NAME"; then
         log "no $JOB_NAME in the queue and nothing left to sync: exiting"
         break
     fi
