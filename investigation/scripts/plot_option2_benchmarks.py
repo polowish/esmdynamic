@@ -29,6 +29,8 @@ MODELS = [  # (key in the results, legend label, colour)
     ("v2ft-all-heads-fixed-s0", "fine-tuned, bug fixed", "#1D3BE2"),
 ]
 REF = "v2-released"
+SHORT = {"auroc": "AUROC", "bal_acc": "balanced\naccuracy", "precision": "precision", "recall": "recall",
+         "f1": "F1", "rmse": "occupancy\nRMSE"}
 TEMPS = [320, 348, 379, 413, 450]
 TITLES = {"auroc": "AUROC", "bal_acc": "balanced accuracy", "rmse": "occupancy RMSE (lower is better)",
           "precision": "precision", "recall": "recall", "f1": "F1"}
@@ -53,7 +55,7 @@ def mdcath_figure(S, out, clean, fs):
     metrics = ["auroc", "bal_acc", "rmse"]
     fig, axes = plt.subplots(2, 3, figsize=(15, 9.2 if not clean else 8.6), facecolor="white",
                              gridspec_kw=dict(height_ratios=[1.25, 1]))
-    fig.subplots_adjust(top=0.83 if not clean else 0.93, bottom=0.08, left=0.07, right=0.985,
+    fig.subplots_adjust(top=0.83 if not clean else 0.84, bottom=0.08, left=0.07, right=0.985,
                         hspace=0.42, wspace=0.26)
     x = np.arange(len(TEMPS))
     for c, m in enumerate(metrics):
@@ -92,7 +94,8 @@ def mdcath_figure(S, out, clean, fs):
     h += [Line2D([], [], color=INK_2, marker="o", ls="", ms=7, label="all 270 test domains"),
           Line2D([], [], color=INK_2, marker="o", mfc="none", ls="", ms=7, mew=1.8,
                  label="domains not in RCSB pre-training")]
-    fig.legend(handles=h, loc="upper center", bbox_to_anchor=(0.53, 0.995 if clean else 0.905), ncol=5,
+    fig.legend(handles=h, loc="upper center", bbox_to_anchor=(0.5, 0.995) if clean else (0.53, 0.905),
+               ncol=3 if clean else 5,
                frameon=False, fontsize=10 * fs, labelcolor=INK, handlelength=2.0, columnspacing=1.6)
     if not clean:
         fig.text(0.07, 0.985, "Fine-tuning ESMDynamic with working DCM blocks: mdCATH test",
@@ -111,7 +114,7 @@ def atlas_figure(S, out, clean, fs):
     metrics = ["auroc", "bal_acc", "precision", "recall", "f1", "rmse"]
     fig, axes = plt.subplots(1, 2, figsize=(15, 6.2 if not clean else 5.8), facecolor="white",
                              gridspec_kw=dict(width_ratios=[1.35, 1]))
-    fig.subplots_adjust(top=0.74 if not clean else 0.84, bottom=0.17, left=0.06, right=0.985, wspace=0.18)
+    fig.subplots_adjust(top=0.74 if not clean else 0.76, bottom=0.17, left=0.06, right=0.985, wspace=0.18)
     key0 = "t12/320K"
     x = np.arange(len(metrics)); w = 0.26
     ax = axes[0]
@@ -120,8 +123,7 @@ def atlas_figure(S, out, clean, fs):
         se = [S[f"{key0}/all"][key][m]["se"] for m in metrics]
         ax.bar(x + (k - 1) * w, mu, w, yerr=se, color=col, label=label, capsize=2.5,
                error_kw=dict(ecolor=INK_2, lw=1), zorder=3)
-    ax.set_xticks(x); ax.set_xticklabels([TITLES[m].split(" (")[0].replace("occupancy ", "occupancy\n")
-                                          for m in metrics], fontsize=10 * fs)
+    ax.set_xticks(x); ax.set_xticklabels([SHORT[m] for m in metrics], fontsize=10 * fs)
     ax.set_ylim(0, 1)
     ax.set_ylabel("score (mean ± se over chains)", color=INK_2, fontsize=11 * fs)
     ax.set_title("ATLAS test, 82 chains", loc="left", fontsize=12.5 * fs, color=INK, pad=8)
@@ -134,8 +136,7 @@ def atlas_figure(S, out, clean, fs):
                         yerr=[[v["diff"] - v["lo"] for v in d], [v["hi"] - v["diff"] for v in d]],
                         fmt="o", ms=6.5, color=col, mfc=fill, mew=1.8, capsize=3, lw=1.8, zorder=3)
     ax.axhline(0, color=INK_2, lw=1)
-    ax.set_xticks(x); ax.set_xticklabels([TITLES[m].split(" (")[0].replace("occupancy ", "occupancy\n")
-                                          for m in metrics], fontsize=10 * fs)
+    ax.set_xticks(x); ax.set_xticklabels([SHORT[m] for m in metrics], fontsize=10 * fs)
     ax.set_ylabel("paired difference vs released V2 (95% CI)", color=INK_2, fontsize=11 * fs)
     n_un = S[f"{key0}/not_in_rcsb_train"][REF]["auroc"]["n"]
     ax.set_title(f"change vs released V2", loc="left", fontsize=12.5 * fs, color=INK, pad=8)
@@ -145,7 +146,8 @@ def atlas_figure(S, out, clean, fs):
     h += [Line2D([], [], color=INK_2, marker="o", ls="", ms=7, label="all 82 chains"),
           Line2D([], [], color=INK_2, marker="o", mfc="none", ls="", ms=7, mew=1.8,
                  label=f"{n_un} chains not in RCSB pre-training")]
-    fig.legend(handles=h, loc="upper center", bbox_to_anchor=(0.52, 0.99 if clean else 0.86), ncol=5,
+    fig.legend(handles=h, loc="upper center", bbox_to_anchor=(0.5, 0.995) if clean else (0.52, 0.86),
+               ncol=3 if clean else 5,
                frameon=False, fontsize=10 * fs, labelcolor=INK, handlelength=2.0, columnspacing=1.4)
     if not clean:
         fig.text(0.06, 0.985, "Fine-tuning ESMDynamic with working DCM blocks: ATLAS test",
