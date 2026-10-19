@@ -57,7 +57,10 @@ while true; do
         echo $! > $s.pid
         active=$((active + 1))
     done
-    if [ $active -eq 0 ] && ! squeue -u $USER -h -o %j 2>/dev/null | grep -q "^$JOB_NAME"; then
+    # an after_* watcher job (submit_when_done.sh) means more runs are coming: between one run
+    # writing DONE and the watcher's next poll nothing named $JOB_NAME is queued, and exiting
+    # there left option 2 unsynced (2026-10-16)
+    if [ $active -eq 0 ] && ! squeue -u $USER -h -o %j 2>/dev/null | grep -qE "^($JOB_NAME|after_)"; then
         log "no $JOB_NAME in the queue and nothing left to sync: exiting"
         break
     fi
