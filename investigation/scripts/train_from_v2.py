@@ -3,7 +3,7 @@
     # option 1: train only what never trained (blocks + the occupancy head's single-state path)
     python investigation/scripts/train_from_v2.py --trainable at-init --arm fixed --seed 0 \
         --train-cache ~/scratch/esmdyn_cache/mdcath_train --val-cache ~/scratch/esmdyn_cache/mdcath_val \
-        --out ~/scratch/esmdyn_retrain/runs/opt1_fixed_s0 --resume
+        --out ~/scratch/esmdyn_retrain/runs/v2ft-dcm-only-fixed-s0 --resume
     # option 2: every head parameter, with the fix and (control) without it
     python investigation/scripts/train_from_v2.py --trainable all --arm fixed ...
     python investigation/scripts/train_from_v2.py --trainable all --arm bug ...

@@ -2,7 +2,7 @@
 # Submit follow-on training jobs once a run has finished (its DONE file exists).
 #
 #   setsid nohup bash investigation/scripts/submit_when_done.sh \
-#       ~/scratch/esmdyn_retrain/runs/opt1_fixed_s0 retrain_opt1 retrain_opt2 \
+#       ~/scratch/esmdyn_retrain/runs/v2ft-dcm-only-fixed-s0 retrain_opt1 retrain_opt2 \
 #       "--job-name=retrain_opt2 investigation/slurm/train_from_v2.sbatch all fixed 0" \
 #       "--job-name=retrain_opt2 investigation/slurm/train_from_v2.sbatch all bug 0" \
 #       > ~/scratch/esmdyn_retrain/logs/after_opt1.log 2>&1 < /dev/null &

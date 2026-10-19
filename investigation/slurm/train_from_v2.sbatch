@@ -3,7 +3,7 @@
 #   sbatch investigation/slurm/train_from_v2.sbatch at-init fixed 0     # option 1
 #   sbatch investigation/slurm/train_from_v2.sbatch all fixed 0         # option 2
 #   sbatch investigation/slurm/train_from_v2.sbatch all bug 0           # option 2's control
-# (from the investigation worktree). Out: ~/scratch/esmdyn_retrain/runs/opt{1,2}_<arm>_s<seed>.
+# (from the investigation worktree). Out: ~/scratch/esmdyn_retrain/runs/v2ft-{dcm-only,all-heads}-<arm>-s<seed>.
 #
 # L40S only (user, 2026-10-15): the cache was written on L40S, and anything that runs ESMFold
 # live later (test-set evaluation) runs there too. 8 h jobs backfill far better than one long
@@ -27,8 +27,10 @@ export WANDB_DIR=$HOME/scratch/esmdyn_retrain/wandb      # offline; synced from 
 mkdir -p $WANDB_DIR
 
 TRAINABLE=$1; ARM=$2; SEED=${3:-0}
-case $TRAINABLE in at-init) OPT=opt1;; all) OPT=opt2;; *) echo "trainable: at-init|all" >&2; exit 2;; esac
-OUT=$HOME/scratch/esmdyn_retrain/runs/${OPT}_${ARM}_s${SEED}
+# run name = output folder = W&B display name: v2ft-<what trains>-<arm>-s<seed>
+# (v2ft: fine-tuned from the released V2 heads; option 1 = dcm-only, option 2 = all-heads)
+case $TRAINABLE in at-init) SCOPE=dcm-only;; all) SCOPE=all-heads;; *) echo "trainable: at-init|all" >&2; exit 2;; esac
+OUT=$HOME/scratch/esmdyn_retrain/runs/v2ft-${SCOPE}-${ARM}-s${SEED}
 C=$HOME/scratch/esmdyn_cache
 mkdir -p $OUT
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader

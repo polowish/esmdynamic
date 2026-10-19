@@ -135,6 +135,11 @@ model at step 0, and anything that changes comes from training with blocks that 
      `scripts/submit_when_done.sh` on the login node (log `~/scratch/esmdyn_retrain/logs/after_opt1.log`),
      which submits them when `runs/opt1_fixed_s0/DONE` appears and then starts their W&B live
      sync. More seeds (and per-seed block re-initialisation) await the user's decision.
+   - **2026-10-19:** all three seed-0 runs early-stopped (val loss vs V2: option 1 −17.5%,
+     option 2 fixed −17.9%, option 2 bug −1.0%). Renamed (folders and W&B display names; W&B
+     run ids unchanged): `opt1_fixed_s0` → `v2ft-dcm-only-fixed-s0` (c2cc8317),
+     `opt2_fixed_s0` → `v2ft-all-heads-fixed-s0` (76db1bfa), `opt2_bug_s0` →
+     `v2ft-all-heads-bug-s0` (4657d26b). New runs use this scheme.
 
 ## Checks built in
 
