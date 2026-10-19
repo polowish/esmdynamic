@@ -107,6 +107,56 @@ def test_loss_equals_esmdynamic_loss():
     assert np.isclose(per["dynamic_logits"], float(fl.sum()), rtol=1e-5)
 
 
+def test_masked_dynamic_loss_drops_only_near_diagonal_pairs():
+    """min_sep=3: the dynamic loss is the same focal loss summed over |i-j| >= 3 only; the other
+    five heads are untouched; min_sep=0 is still esmdynamic_loss exactly."""
+    g = torch.Generator().manual_seed(2)
+    L, B = 12, 1
+    st = {"dynamic_logits": torch.randn(B, 5, L, L, generator=g),
+          "dynamic_confidence": torch.rand(B, 5, L, generator=g),
+          "kinetic_logits": torch.randn(B, 5, 2, L, L, 6, generator=g),
+          "kinetic_confidence": torch.rand(B, 5, L, generator=g),
+          "frequency_pred": torch.rand(B, 5, L, L, generator=g),
+          "frequency_residual_pred": torch.rand(B, 5, L, L, generator=g),
+          "s_s": torch.zeros(1)}
+    dyn = (torch.rand(B, 5, L, L, generator=g) > 0.7).float()
+    kin = torch.randint(0, 6, (B, 5, 2, L, L), generator=g).float()
+    freq = torch.rand(B, 5, L, L, generator=g)
+    lengths = torch.tensor([L - 2])                              # padding must stay masked too
+    kin_w = torch.rand(2, 6, generator=g) + 0.5
+    t0, p0, _, _ = R.compute_loss(st, (dyn, kin, freq, lengths), R.ALL_LOSSES, 0.85, kin_w)
+    t3, p3, outs, tgts = R.compute_loss(st, (dyn, kin, freq, lengths), R.ALL_LOSSES, 0.85, kin_w, min_sep=3)
+    for h in R.ALL_LOSSES:
+        if h != "dynamic_logits":
+            assert np.isclose(p3[h], p0[h], rtol=1e-6), h
+    x, t = st["dynamic_logits"], dyn
+    p = torch.sigmoid(x)
+    ce = torch.nn.functional.binary_cross_entropy_with_logits(x, t, reduction="none")
+    fl = (0.85 * t + 0.15 * (1 - t)) * ce * (1 - (p * t + (1 - p) * (1 - t))) ** 2
+    i = torch.arange(L)
+    keep = ((i[:, None] - i[None, :]).abs() >= 3) & (i[:, None] < L - 2) & (i[None, :] < L - 2)
+    assert np.isclose(p3["dynamic_logits"], float((fl * keep).sum()), rtol=1e-5)
+    assert p3["dynamic_logits"] < p0["dynamic_logits"]
+    assert np.isclose(float(t3), np.mean(list(p3.values())), rtol=1e-6)    # mean over heads
+
+
+def test_lr_schedule_and_ema():
+    import train_from_v2 as T
+    f = lambda s: T.lr_factor(s, warmup=10, total=110, schedule="cosine", floor=0.01)  # noqa: E731
+    assert np.isclose(f(0), 0.1) and np.isclose(f(9), 1.0) and np.isclose(f(10), 1.0)
+    assert np.isclose(f(60), 0.505) and np.isclose(f(110), 0.01) and np.isclose(f(500), 0.01)
+    assert all(f(s) >= f(s + 1) for s in range(10, 200))
+    assert T.lr_factor(1000, 0, 10, "constant", 0.01) == 1.0
+    p = torch.nn.Parameter(torch.zeros(3))
+    ema = T.EMA([("w", p)], decay=0.9)
+    with torch.no_grad():
+        p.fill_(1.0)
+    ema.update()
+    assert torch.allclose(ema.shadow["w"], torch.full((3,), 0.1))
+    ema.swap(); assert torch.allclose(p.detach(), torch.full((3,), 0.1))
+    ema.swap(); assert torch.allclose(p.detach(), torch.ones(3))
+
+
 # ---- crops and sampling = DynContactDataset + WeightedRandomSampler
 def test_windows_cover_every_drawable_crop():
     lengths = [100, 256, 257, 300]

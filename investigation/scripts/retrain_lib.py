@@ -310,10 +310,29 @@ def run_heads(model, structure, cache_enabled, device_type="cuda"):
     return st
 
 
-def compute_loss(structure, targets, loss_heads, alpha, kin_w, gamma=2.0):
+def masked_dynamic_loss(min_sep):
+    """loss.loss_dynamic_logits restricted to pairs with |i - j| >= min_sep. Pairs within 2
+    residues are never dynamic (Calpha-Calpha <= ~7.6 A < 8.5 A; checked on every mdCATH test
+    label, note 13) and the published SI Table 6 protocol does not score them; min_sep=3 drops
+    those trivially easy negatives from the loss. Labels are unchanged."""
+    from esm.esmdynamic.training import loss as loss_mod
+
+    def fn(logits, target, lengths, alpha=0.25, gamma=2):
+        B, C, L, _ = logits.shape
+        mask = loss_mod.length_mask_2d(B, L, lengths, logits.device)
+        idx = torch.arange(L, device=logits.device)
+        mask = mask & ((idx[:, None] - idx[None, :]).abs() >= min_sep)
+        loss = loss_mod.sigmoid_focal_loss(logits, target, reduction="none", alpha=alpha, gamma=gamma)
+        return (loss * mask[:, None]).sum()
+    return fn
+
+
+def compute_loss(structure, targets, loss_heads, alpha, kin_w, gamma=2.0, min_sep=0):
     """train.py's targets (build_outputs_and_targets_for_loss) and loss (esmdynamic_loss: per
     head a sum over valid pairs / residues, then the mean over heads), kinetic class weights
-    cast to the logits' dtype as train.py does. Returns (total, {head: loss}, outputs, targets)."""
+    cast to the logits' dtype as train.py does. Returns (total, {head: loss}, outputs, targets).
+    min_sep > 0 scores the dynamic-contact loss on |i - j| >= min_sep only (masked_dynamic_loss);
+    every other head, and min_sep = 0, is esmdynamic_loss exactly."""
     from esm.esmdynamic.training import loss as loss_mod
     from esm.esmdynamic.training.train import build_outputs_and_targets_for_loss
     dyn, kin, freq, lengths = targets
@@ -324,6 +343,20 @@ def compute_loss(structure, targets, loss_heads, alpha, kin_w, gamma=2.0):
     if kin_w is not None and "kinetic_logits" in outs:
         kw = kin_w.to(device=device, dtype=outs["kinetic_logits"].dtype)
     L = lengths.to(device)
+    if min_sep:
+        funcs = dict(loss_mod.LOSS_FUNCS, dynamic_logits=masked_dynamic_loss(min_sep))
+        terms = {}
+        for h in loss_heads:
+            if h not in funcs:
+                continue
+            if h == "kinetic_logits":
+                terms[h] = funcs[h](outs[h], tgts[h], L, kw)
+            elif h == "dynamic_logits":
+                terms[h] = funcs[h](outs[h], tgts[h], L, alpha=alpha, gamma=gamma)
+            else:
+                terms[h] = funcs[h](outs[h], tgts[h], L)
+        total = sum(terms.values()) / len(terms)            # esmdynamic_loss's mean over heads
+        return total, {h: float(v) for h, v in terms.items()}, outs, tgts
     total = loss_mod.esmdynamic_loss(outs, tgts, L, active_heads=loss_heads,
                                      kin_class_weights=kw, alpha=alpha, gamma=gamma)
     with torch.no_grad():
