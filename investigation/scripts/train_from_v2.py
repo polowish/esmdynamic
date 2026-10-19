@@ -199,7 +199,7 @@ def main():
     meta = dict(vars(args), stage=f"v2-{args.trainable}", cache_enabled=cache_enabled,
                 n_trainable_tensors=len(trainable), n_trainable_params=sum(p.numel() for p in params),
                 batch=args.batch, alpha=ALPHA, steps_per_epoch=steps_per_epoch, warmup_steps_total=warmup,
-                total_schedule_steps=total_steps, lr_groups={g["name"]: g["lr"] for g in groups if g["params"]}, torch=torch.__version__, device=torch.cuda.get_device_name(0),
+                total_schedule_steps=total_steps, lr_groups={g["name"]: g.get("initial_lr", g["lr"]) for g in groups if g["params"]}, torch=torch.__version__, device=torch.cuda.get_device_name(0),
                 n_train_windows=len(store_tr), n_val_windows=len(val_ids))
     (out / "run_meta.json").write_text(json.dumps(meta, indent=2))
     (out / "trainable.txt").write_text("\n".join(trainable) + "\n")
