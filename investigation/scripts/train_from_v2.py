@@ -76,19 +76,20 @@ class EMA:
             tmp = p.detach().clone(); p.copy_(self.shadow[n]); self.shadow[n].copy_(tmp)
 
 
-def validate(model, store, window_ids, cache_enabled, kin_w, workers, min_sep=0):
+def validate(model, store, window_ids, cache_enabled, kin_w, workers, min_sep=0, per_protein=False):
     """Loss (all six heads) and published-protocol metrics on the fixed validation windows.
-    With min_sep > 0 val_loss is the masked training objective (selection and early stopping);
-    val_loss_unmasked is the original all-pairs objective, comparable with unmasked runs."""
+    val_loss is the training objective (selection and early stopping); val_loss_unmasked is
+    always the original objective (esmdynamic_loss: all pairs, summed), comparable across runs."""
     model.eval()
     losses, per, unmasked = [], {h: [] for h in ALL_LOSSES}, []
     m = {k: [[] for _ in range(5)] for k in ("bal_acc", "auroc", "rmse")}
     with torch.no_grad():
         for rec in loader(store, window_ids, workers):
             st = run_heads(model, to_structure(rec, "cuda"), cache_enabled)
-            total, ph, _, _ = compute_loss(st, to_targets(rec), ALL_LOSSES, ALPHA, kin_w, min_sep=min_sep)
+            total, ph, _, _ = compute_loss(st, to_targets(rec), ALL_LOSSES, ALPHA, kin_w, min_sep=min_sep,
+                                           per_protein=per_protein)
             losses.append(float(total))
-            if min_sep:
+            if min_sep or per_protein:
                 unmasked.append(float(compute_loss(st, to_targets(rec), ALL_LOSSES, ALPHA, kin_w)[0]))
             for h in ALL_LOSSES:
                 per[h].append(ph[h])
@@ -96,7 +97,7 @@ def validate(model, store, window_ids, cache_enabled, kin_w, workers, min_sep=0)
                 for k in m:
                     m[k][t].append(row[k])
     out = dict(val_loss=float(np.mean(losses)), **{f"val_loss_{h}": float(np.mean(v)) for h, v in per.items()})
-    out["val_loss_unmasked"] = float(np.mean(unmasked)) if min_sep else out["val_loss"]
+    out["val_loss_unmasked"] = float(np.mean(unmasked)) if (min_sep or per_protein) else out["val_loss"]
     for k, per_t in m.items():
         for t, T in enumerate((320, 348, 379, 413, 450)):
             out[f"val_{k}_{T}K"] = float(np.nanmean(per_t[t]))
@@ -130,6 +131,9 @@ def main():
     ap.add_argument("--lr-floor", type=float, default=0.01, help="cosine end, as a fraction of each base lr")
     ap.add_argument("--ema-decay", type=float, default=0.0, help="weight EMA per optimiser step (0 = off)")
     # the one objective change, asked for by the user: drop never-dynamic near-diagonal pairs
+    ap.add_argument("--per-protein-mean", action="store_true",
+                    help="each head's loss averaged over the window's pairs/residues, rescaled to a 256 window "
+                         "(every protein counts equally; sampling unchanged)")
     ap.add_argument("--min-sep", type=int, default=0,
                     help="dynamic-contact loss on |i-j| >= min-sep only (3 = the SI Table 6 pair set)")
     ap.add_argument("--workers", type=int, default=6)
@@ -210,7 +214,7 @@ def main():
         tmp.rename(path)
 
     if state["epoch"] == 0 and not state["history"]:        # the starting point = released V2
-        v0 = validate(model, store_va, val_ids, cache_enabled, kin_w, args.workers, args.min_sep)
+        v0 = validate(model, store_va, val_ids, cache_enabled, kin_w, args.workers, args.min_sep, args.per_protein_mean)
         state["history"].append(dict(epoch=0, **v0, block_norms=block_output_norms(model)))
         print(json.dumps(state["history"][0]), flush=True)
         tracker.epoch(dict(epoch=0, **v0), model, 0)
@@ -227,7 +231,8 @@ def main():
         acc, acc_h, n_acc, ep, ep_h, ep_n = 0.0, dict.fromkeys(ALL_LOSSES, 0.0), 0, 0.0, dict.fromkeys(ALL_LOSSES, 0.0), 0
         for i, rec in enumerate(loader(store_tr, ids, args.workers)):
             st = run_heads(model, to_structure(rec, "cuda"), cache_enabled)
-            total, per, _, _ = compute_loss(st, to_targets(rec), ALL_LOSSES, ALPHA, kin_w, min_sep=args.min_sep)
+            total, per, _, _ = compute_loss(st, to_targets(rec), ALL_LOSSES, ALPHA, kin_w, min_sep=args.min_sep,
+                                            per_protein=args.per_protein_mean)
             (total / args.batch).backward()
             acc += float(total); n_acc += 1
             for h in ALL_LOSSES:
@@ -255,11 +260,11 @@ def main():
         t_train = time.time() - t0
 
         t1 = time.time()
-        v = validate(model, store_va, val_ids, cache_enabled, kin_w, args.workers, args.min_sep)
+        v = validate(model, store_va, val_ids, cache_enabled, kin_w, args.workers, args.min_sep, args.per_protein_mean)
         if ema is not None:                       # the average, on the same windows and objective
             ema.swap()
             v.update({f"ema_{k}": x for k, x in
-                      validate(model, store_va, val_ids, cache_enabled, kin_w, args.workers, args.min_sep).items()})
+                      validate(model, store_va, val_ids, cache_enabled, kin_w, args.workers, args.min_sep, args.per_protein_mean).items()})
             ema_heads = {k: t.detach().cpu().clone() for k, t in model.heads.state_dict().items()}
             ema.swap()
         changed = [n for n, p in model.named_parameters() if not p.requires_grad

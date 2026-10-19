@@ -327,12 +327,28 @@ def masked_dynamic_loss(min_sep):
     return fn
 
 
-def compute_loss(structure, targets, loss_heads, alpha, kin_w, gamma=2.0, min_sep=0):
+PAIR_LOSSES = {"dynamic_logits", "kinetic_logits", "frequency_pred", "frequency_residual_pred"}
+RESIDUE_LOSSES = {"dynamic_confidence", "kinetic_confidence"}
+
+
+def n_pairs(L, min_sep=0):
+    """Residue pairs (i, j) of an L-long window with |i - j| >= min_sep (all L*L for 0)."""
+    if min_sep <= 0:
+        return L * L
+    return L * L - L - 2 * sum(max(0, L - k) for k in range(1, min_sep))
+
+
+def compute_loss(structure, targets, loss_heads, alpha, kin_w, gamma=2.0, min_sep=0,
+                 per_protein=False, ref_len=CROP):
     """train.py's targets (build_outputs_and_targets_for_loss) and loss (esmdynamic_loss: per
     head a sum over valid pairs / residues, then the mean over heads), kinetic class weights
     cast to the logits' dtype as train.py does. Returns (total, {head: loss}, outputs, targets).
-    min_sep > 0 scores the dynamic-contact loss on |i - j| >= min_sep only (masked_dynamic_loss);
-    every other head, and min_sep = 0, is esmdynamic_loss exactly."""
+    min_sep > 0 scores the dynamic-contact loss on |i - j| >= min_sep only (masked_dynamic_loss).
+    per_protein: each head's sum is divided by the window's number of valid elements (pairs, or
+    residues for the two confidence heads) and multiplied by that number for a ref_len window, so
+    every protein counts equally while a full 256-residue window keeps the exact weight, and the
+    balance between heads, that esmdynamic_loss gives it. One window per call (batch of 1).
+    With min_sep = 0 and per_protein off this is esmdynamic_loss exactly."""
     from esm.esmdynamic.training import loss as loss_mod
     from esm.esmdynamic.training.train import build_outputs_and_targets_for_loss
     dyn, kin, freq, lengths = targets
@@ -343,8 +359,10 @@ def compute_loss(structure, targets, loss_heads, alpha, kin_w, gamma=2.0, min_se
     if kin_w is not None and "kinetic_logits" in outs:
         kw = kin_w.to(device=device, dtype=outs["kinetic_logits"].dtype)
     L = lengths.to(device)
-    if min_sep:
-        funcs = dict(loss_mod.LOSS_FUNCS, dynamic_logits=masked_dynamic_loss(min_sep))
+    if min_sep or per_protein:
+        funcs = dict(loss_mod.LOSS_FUNCS)
+        if min_sep:
+            funcs["dynamic_logits"] = masked_dynamic_loss(min_sep)
         terms = {}
         for h in loss_heads:
             if h not in funcs:
@@ -355,6 +373,15 @@ def compute_loss(structure, targets, loss_heads, alpha, kin_w, gamma=2.0, min_se
                 terms[h] = funcs[h](outs[h], tgts[h], L, alpha=alpha, gamma=gamma)
             else:
                 terms[h] = funcs[h](outs[h], tgts[h], L)
+            if per_protein:
+                assert L.numel() == 1, "per_protein normalisation expects one window per call"
+                n = int(L.item()); sep = min_sep if h == "dynamic_logits" else 0
+                if h in PAIR_LOSSES:
+                    terms[h] = terms[h] * (n_pairs(ref_len, sep) / n_pairs(n, sep))
+                elif h in RESIDUE_LOSSES:
+                    terms[h] = terms[h] * (ref_len / n)
+                else:
+                    raise ValueError(f"no element count for {h}")
         total = sum(terms.values()) / len(terms)            # esmdynamic_loss's mean over heads
         return total, {h: float(v) for h, v in terms.items()}, outs, tgts
     total = loss_mod.esmdynamic_loss(outs, tgts, L, active_heads=loss_heads,

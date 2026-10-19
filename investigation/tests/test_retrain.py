@@ -140,6 +140,41 @@ def test_masked_dynamic_loss_drops_only_near_diagonal_pairs():
     assert np.isclose(float(t3), np.mean(list(p3.values())), rtol=1e-6)    # mean over heads
 
 
+def test_per_protein_mean():
+    """--per-protein-mean: a 256-residue window keeps its exact loss; a shorter one is scaled up by
+    (elements at 256) / (its elements), per head; the pair counts match brute force."""
+    for L in (5, 12, 256):
+        for k in (0, 1, 3):
+            i = np.arange(L)
+            assert R.n_pairs(L, k) == int((np.abs(i[:, None] - i[None, :]) >= k).sum()), (L, k)
+
+    def fake(L, seed):
+        g = torch.Generator().manual_seed(seed); B = 1
+        st = {"dynamic_logits": torch.randn(B, 5, L, L, generator=g),
+              "dynamic_confidence": torch.rand(B, 5, L, generator=g),
+              "kinetic_logits": torch.randn(B, 5, 2, L, L, 6, generator=g),
+              "kinetic_confidence": torch.rand(B, 5, L, generator=g),
+              "frequency_pred": torch.rand(B, 5, L, L, generator=g),
+              "frequency_residual_pred": torch.rand(B, 5, L, L, generator=g), "s_s": torch.zeros(1)}
+        tg = ((torch.rand(B, 5, L, L, generator=g) > 0.7).float(),
+              torch.randint(0, 6, (B, 5, 2, L, L), generator=g).float(),
+              torch.rand(B, 5, L, L, generator=g), torch.tensor([L]))
+        return st, tg
+    kin_w = torch.rand(2, 6, generator=torch.Generator().manual_seed(9)) + 0.5
+    for min_sep in (0, 3):
+        st, tg = fake(256, 3)
+        a = R.compute_loss(st, tg, R.ALL_LOSSES, 0.85, kin_w, min_sep=min_sep)[1]
+        b = R.compute_loss(st, tg, R.ALL_LOSSES, 0.85, kin_w, min_sep=min_sep, per_protein=True)[1]
+        assert all(np.isclose(a[h], b[h], rtol=1e-6) for h in a), (min_sep, a, b)
+        st, tg = fake(128, 4)
+        a = R.compute_loss(st, tg, R.ALL_LOSSES, 0.85, kin_w, min_sep=min_sep)[1]
+        b = R.compute_loss(st, tg, R.ALL_LOSSES, 0.85, kin_w, min_sep=min_sep, per_protein=True)[1]
+        for h in a:
+            sep = min_sep if h == "dynamic_logits" else 0
+            want = (R.n_pairs(256, sep) / R.n_pairs(128, sep)) if h in R.PAIR_LOSSES else 2.0
+            assert np.isclose(b[h] / a[h], want, rtol=1e-5), (h, b[h] / a[h], want)
+
+
 def test_lr_schedule_and_ema():
     import train_from_v2 as T
     f = lambda s: T.lr_factor(s, warmup=10, total=110, schedule="cosine", floor=0.01)  # noqa: E731
