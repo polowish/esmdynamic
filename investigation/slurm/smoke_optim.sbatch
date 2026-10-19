@@ -20,7 +20,7 @@ rm -rf $R; mkdir -p $R
 git log --oneline -1
 common=(--trainable all --arm fixed --seed 0 --train-cache $C/mdcath_train --val-cache $C/mdcath_val
         --out $R --n-train 64 --batch 16 --lr-blocks 3e-4 --lr-other 3e-5 --schedule cosine
-        --warmup-epochs 0.5 --cosine-epochs 3 --ema-decay 0.9 --min-sep 3 --wandb off)
+        --warmup-epochs 0.5 --cosine-epochs 3 --ema-decay 0.9 --min-sep 3 --per-protein-mean --wandb off)
 python -u investigation/scripts/train_from_v2.py "${common[@]}" --max-epochs 2 2>&1 | grep -vE "Warning|autocast|^\s+with" | tail -4
 python -u investigation/scripts/train_from_v2.py "${common[@]}" --max-epochs 3 --resume 2>&1 | grep -vE "Warning|autocast|^\s+with" | grep -E "resumed|cap raised|finished" 
 python - <<PY
